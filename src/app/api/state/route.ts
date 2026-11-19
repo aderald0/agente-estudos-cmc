@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { checkPin, ensureSchema, getSql } from '../../../lib/db';
+import { getCurrentSession } from '../../../lib/auth';
+import { ensureSchema, getSql } from '../../../lib/db';
 
-export async function GET(req: Request) {
-  if (!checkPin(req)) {
-    return NextResponse.json({ pinRequired: true }, { status: 401 });
+export async function GET() {
+  const session = await getCurrentSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
   }
 
   try {

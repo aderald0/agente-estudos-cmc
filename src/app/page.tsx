@@ -55,11 +55,6 @@ interface ChatMsg {
   content: string;
 }
 
-function todayISO() {
-  const now = new Date();
-  return now.toISOString().slice(0, 10);
-}
-
 function fmtBR(iso: string) {
   if (!iso) return '—';
   const parts = iso.split('-');
@@ -67,8 +62,7 @@ function fmtBR(iso: string) {
 }
 
 function renderFormattedText(md: string) {
-  const lines = md.split('\n');
-  return lines.map((line, i) => {
+  return md.split('\n').map((line, i) => {
     const html = line
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -83,15 +77,54 @@ function renderFormattedText(md: string) {
   });
 }
 
+// Cohesive 18x18 SVG Icon Set (1.6px stroke, rounded caps)
+const Icon = {
+  Book: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+  ),
+  Message: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+  ),
+  Checklist: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+  ),
+  Pen: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+  ),
+  Layers: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+  ),
+  Lock: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+  ),
+  Check: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+  ),
+  SunMoon: () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/></svg>
+  ),
+  Logout: () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+  ),
+};
+
 export default function HomePage() {
   const [view, setView] = useState<'chat' | 'edital' | 'lab' | 'notebooklm'>('chat');
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [authChecked, setAuthChecked] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
+
+  // Login / Setup Form
+  const [authUser, setAuthUser] = useState('');
+  const [authPass, setAuthPass] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+
+  // App State
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState('');
-  const [pinRequired, setPinRequired] = useState(false);
-  const [pinInput, setPinInput] = useState('');
-  const [pin, setPin] = useState('');
-
   const [geminiConfigured, setGeminiConfigured] = useState(false);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [logs, setLogs] = useState<StudyLog[]>([]);
@@ -124,41 +157,34 @@ export default function HomePage() {
   const [ncOverlap, setNcOverlap] = useState('ambos-identico');
   const [ncStudy, setNcStudy] = useState(true);
 
-  // Lab: Discursiva & Erros
+  // Lab
   const [essayId, setEssayId] = useState(ESSAY_PROMPTS[0].id);
   const [essayText, setEssayText] = useState('');
   const [errSub, setErrSub] = useState(SUBJECT_META[0].name);
   const [errTop, setErrTop] = useState('');
   const [errMis, setErrMis] = useState('');
   const [errCor, setErrCor] = useState('');
+  const [errFormFeedback, setErrFormFeedback] = useState('');
 
   // NotebookLM
   const [nlmTopicId, setNlmTopicId] = useState('');
   const [nlmMode, setNlmMode] = useState('podcast');
   const [nlmCopied, setNlmCopied] = useState('');
 
-  const apiFetch = useCallback(async (url: string, init?: RequestInit) => {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const activePin = pin || (typeof window !== 'undefined' ? localStorage.getItem('cmc_pin') || '' : '');
-    if (activePin) headers['x-app-pin'] = activePin;
-    return fetch(url, { ...init, headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) } });
-  }, [pin]);
-
   const loadState = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await apiFetch('/api/state');
+      const res = await fetch('/api/state', { credentials: 'same-origin' });
       if (res.status === 401) {
-        setPinRequired(true);
+        setAuthenticated(false);
         setLoading(false);
         return;
       }
       const data = await res.json();
       if (!res.ok) {
-        setDbError(data.error || 'Erro ao carregar dados.');
-        setLoading(false);
+        setDbError(data.error || 'Falha ao carregar dados.');
         return;
       }
-      setPinRequired(false);
       setDbError('');
       setGeminiConfigured(Boolean(data.geminiConfigured));
       setTopics(data.topics || []);
@@ -171,20 +197,38 @@ export default function HomePage() {
         setNlmTopicId(prev => prev || data.topics[0].id);
       }
     } catch (e) {
-      setDbError(e instanceof Error ? e.message : 'Falha de rede');
+      setDbError(e instanceof Error ? e.message : 'Erro de conexão');
     } finally {
       setLoading(false);
     }
-  }, [apiFetch]);
+  }, []);
+
+  const checkAuth = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth', { credentials: 'same-origin' });
+      const data = await res.json();
+      setNeedsSetup(Boolean(data.needsSetup));
+      setAuthenticated(Boolean(data.authenticated));
+      setUsername(data.username || null);
+      if (data.authenticated) {
+        await loadState();
+      } else {
+        setLoading(false);
+      }
+    } catch {
+      setDbError('Não foi possível verificar autenticação com o servidor.');
+      setLoading(false);
+    } finally {
+      setAuthChecked(true);
+    }
+  }, [loadState]);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('cmc_theme') === 'light' ? 'light' : 'dark';
+    const savedTheme = localStorage.getItem('cmc_theme') === 'dark' ? 'dark' : 'light';
     setTheme(savedTheme);
-    document.body.classList.toggle('light', savedTheme === 'light');
-    const savedPin = localStorage.getItem('cmc_pin') || '';
-    if (savedPin) setPin(savedPin);
-    loadState();
-  }, [loadState]);
+    document.body.classList.toggle('dark', savedTheme === 'dark');
+    checkAuth();
+  }, [checkAuth]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -205,16 +249,60 @@ export default function HomePage() {
   }, [timerRunning]);
 
   const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark';
+    const next = theme === 'light' ? 'dark' : 'light';
     setTheme(next);
     localStorage.setItem('cmc_theme', next);
-    document.body.classList.toggle('light', next === 'light');
+    document.body.classList.toggle('dark', next === 'dark');
   };
 
+  async function handleAuthSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setAuthError('');
+    setAuthSubmitting(true);
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          action: needsSetup ? 'setup' : 'login',
+          username: authUser,
+          password: authPass,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAuthError(data.error || 'Falha na autenticação.');
+        return;
+      }
+      setAuthPass('');
+      setNeedsSetup(false);
+      setAuthenticated(true);
+      setUsername(data.username);
+      await loadState();
+    } catch {
+      setAuthError('Erro de rede ao tentar autenticar.');
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
+  async function handleLogout() {
+    await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ action: 'logout' }),
+    });
+    setAuthenticated(false);
+    setUsername(null);
+    setTopics([]);
+    setChat([]);
+  }
+
   const daysLeft = useMemo(() => {
-    const now = new Date();
     const exam = new Date(`${EXAM_DATE}T08:00:00`);
-    return Math.max(0, Math.ceil((exam.getTime() - now.getTime()) / 86400000));
+    return Math.max(0, Math.ceil((exam.getTime() - Date.now()) / 86400000));
   }, []);
 
   const stats = useMemo(() => {
@@ -264,13 +352,15 @@ export default function HomePage() {
     setChat(prev => [...prev, { id: Date.now(), role: 'user', content: text }]);
     setChatBusy(true);
     try {
-      const res = await apiFetch('/api/chat', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ message: text }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setChat(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: `**Erro:** ${data.error || 'Falha na API'}` }]);
+        setChat(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: `**Erro:** ${data.error || 'Falha ao consultar o mentor.'}` }]);
       } else {
         await loadState();
       }
@@ -282,19 +372,30 @@ export default function HomePage() {
   }
 
   async function clearChat() {
-    await apiFetch('/api/chat', { method: 'DELETE' });
+    await fetch('/api/chat', { method: 'DELETE', credentials: 'same-origin' });
     await loadState();
   }
 
   async function topicAction(payload: Record<string, unknown>) {
-    await apiFetch('/api/topics', { method: 'POST', body: JSON.stringify(payload) });
+    await fetch('/api/topics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload),
+    });
     await loadState();
   }
 
   async function addError() {
-    if (!errMis.trim() || !errCor.trim()) return;
-    await apiFetch('/api/errors', {
+    if (!errMis.trim() || !errCor.trim()) {
+      setErrFormFeedback('Preencha o erro cometido e a regra correta.');
+      return;
+    }
+    setErrFormFeedback('');
+    await fetch('/api/errors', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({ subject: errSub, topic: errTop.trim() || 'Geral', mistake: errMis.trim(), correction: errCor.trim() }),
     });
     setErrTop(''); setErrMis(''); setErrCor('');
@@ -302,15 +403,22 @@ export default function HomePage() {
   }
 
   async function deleteError(id: number) {
-    await apiFetch('/api/errors', { method: 'DELETE', body: JSON.stringify({ id }) });
+    await fetch('/api/errors', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ id }),
+    });
     await loadState();
   }
 
   async function saveEssay() {
     if (!essayText.trim()) return;
     const p = ESSAY_PROMPTS.find(x => x.id === essayId);
-    await apiFetch('/api/essays', {
+    await fetch('/api/essays', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({ cargo: p?.cargo || '', title: p?.title || 'Rascunho', text: essayText.trim() }),
     });
     setEssayText('');
@@ -351,109 +459,156 @@ export default function HomePage() {
     URL.revokeObjectURL(url);
   }
 
-  if (pinRequired) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Loading Skeleton before auth check
+  if (!authChecked) {
     return (
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 16 }}>
-        <div className="panel" style={{ maxWidth: 380, width: '100%' }}>
-          <div className="panel-head"><span>Acesso Protegido (PIN)</span></div>
-          <div className="panel-body space-y">
-            <p className="text-xs muted" style={{ margin: 0 }}>Digite o PIN configurado em <code>APP_ACCESS_PIN</code> na Vercel.</p>
-            <input
-              type="password"
-              className="field"
-              value={pinInput}
-              onChange={e => setPinInput(e.target.value)}
-              placeholder="PIN de acesso"
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  localStorage.setItem('cmc_pin', pinInput);
-                  setPin(pinInput);
-                  setLoading(true);
-                  setTimeout(loadState, 50);
-                }
-              }}
-            />
-            <button
-              className="btn btn-primary"
-              style={{ width: '100%' }}
-              onClick={() => {
-                localStorage.setItem('cmc_pin', pinInput);
-                setPin(pinInput);
-                setLoading(true);
-                setTimeout(loadState, 50);
-              }}
-            >
-              Entrar
-            </button>
-          </div>
+      <div className="auth-screen">
+        <div className="auth-card space-y">
+          <div className="skeleton" style={{ height: 22, width: '65%' }} />
+          <div className="skeleton" style={{ height: 14, width: '90%' }} />
+          <div className="skeleton" style={{ height: 38 }} />
+          <div className="skeleton" style={{ height: 38 }} />
         </div>
       </div>
     );
   }
 
-  const today = todayISO();
+  // Login / First-time Setup Gate
+  if (!authenticated) {
+    return (
+      <div className="auth-screen">
+        <form onSubmit={handleAuthSubmit} className="auth-card space-y">
+          <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+            <div className="brand">
+              <div className="brand-mark"><Icon.Lock /></div>
+              <div>
+                <h1 style={{ fontSize: 16 }}>{needsSetup ? 'Configuração Inicial' : 'Acesso ao Caderno'}</h1>
+                <div className="brand-sub">Câmara Municipal de Cuiabá 2026</div>
+              </div>
+            </div>
+            <button type="button" onClick={toggleTheme} className="btn btn-sm" aria-label="Alternar tema"><Icon.SunMoon /></button>
+          </div>
+
+          <p className="text-xs muted" style={{ margin: 0 }}>
+            {needsSetup
+              ? 'Crie seu usuário e senha pessoais. Após este cadastro inicial, novos registros ficam bloqueados para proteger seu banco e sua chave Gemini.'
+              : 'Entre com suas credenciais para acessar seu plano de estudos, revisões e mentor.'}
+          </p>
+
+          <div>
+            <label htmlFor="auth-user" className="text-xs muted" style={{ display: 'block', marginBottom: 4 }}>Usuário</label>
+            <input
+              id="auth-user"
+              type="text"
+              required
+              autoComplete="username"
+              className="field"
+              value={authUser}
+              onChange={e => setAuthUser(e.target.value)}
+              placeholder="ex: aderaldo"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="auth-pass" className="text-xs muted" style={{ display: 'block', marginBottom: 4 }}>
+              Senha {needsSetup && '(mínimo 8 caracteres)'}
+            </label>
+            <input
+              id="auth-pass"
+              type="password"
+              required
+              minLength={needsSetup ? 8 : 1}
+              autoComplete={needsSetup ? 'new-password' : 'current-password'}
+              className="field"
+              value={authPass}
+              onChange={e => setAuthPass(e.target.value)}
+              placeholder="••••••••"
+            />
+          </div>
+
+          {authError && <div className="inline-error">{authError}</div>}
+
+          <button type="submit" disabled={authSubmitting} className="btn btn-primary" style={{ width: '100%' }}>
+            {authSubmitting ? 'Verificando...' : (needsSetup ? 'Criar Conta e Entrar' : 'Entrar')}
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
       {/* Topbar */}
       <header className="topbar">
         <div className="brand">
-          <div className="brand-mark">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-          </div>
+          <div className="brand-mark"><Icon.Book /></div>
           <div>
-            <h1>Agente de Estudos CMC 2026</h1>
-            <div className="brand-sub">Analista TI (Manhã) &amp; Técnico Legislativo (Tarde) • Neon Postgres + Gemini</div>
+            <h1>Caderno de Estudos — Câmara de Cuiabá</h1>
+            <div className="brand-sub">Analista Legislativo TI (Manhã) &amp; Técnico Legislativo (Tarde)</div>
           </div>
         </div>
 
         <div className="topbar-actions">
-          <span className="pill">{daysLeft} dias até 20/12</span>
-          <span className={`pill ${geminiConfigured ? 'ok' : 'warn'}`}>
-            {geminiConfigured ? 'Gemini API Conectada' : 'Falta GEMINI_API_KEY na Vercel'}
+          <span className="tag">{daysLeft} dias até 20/12</span>
+          <span className={`tag ${geminiConfigured ? 'ok' : 'warn'}`}>
+            {geminiConfigured ? 'Mentor Conectado' : 'Sem GEMINI_API_KEY'}
           </span>
-          <span className={`pill ${dbError ? 'danger' : 'ok'}`}>
-            {dbError ? 'Erro Neon DB' : 'Neon Postgres Online'}
-          </span>
-          <button onClick={toggleTheme} className="btn btn-sm">Tema</button>
+          {username && <span className="tag">{username}</span>}
+          <button onClick={toggleTheme} className="btn btn-sm" aria-label="Alternar tema"><Icon.SunMoon /></button>
+          <button onClick={handleLogout} className="btn btn-sm" aria-label="Sair da conta"><Icon.Logout /> Sair</button>
         </div>
       </header>
 
-      {/* Nav */}
-      <nav className="nav-tabs">
-        <button className={`nav-tab ${view === 'chat' ? 'active' : ''}`} onClick={() => setView('chat')}>Agente Mentor (Chat)</button>
-        <button className={`nav-tab ${view === 'edital' ? 'active' : ''}`} onClick={() => setView('edital')}>Edital Cruzado &amp; Progresso</button>
-        <button className={`nav-tab ${view === 'lab' ? 'active' : ''}`} onClick={() => setView('lab')}>Discursiva (20–30 linhas) &amp; Erros</button>
-        <button className={`nav-tab ${view === 'notebooklm' ? 'active' : ''}`} onClick={() => setView('notebooklm')}>NotebookLM &amp; Histórico</button>
+      {/* Navigation */}
+      <nav className="nav-tabs" role="tablist">
+        <button role="tab" aria-selected={view === 'chat'} className={`nav-tab ${view === 'chat' ? 'active' : ''}`} onClick={() => setView('chat')}>
+          <Icon.Message /> Mentor de Estudos
+        </button>
+        <button role="tab" aria-selected={view === 'edital'} className={`nav-tab ${view === 'edital' ? 'active' : ''}`} onClick={() => setView('edital')}>
+          <Icon.Checklist /> Edital Cruzado
+        </button>
+        <button role="tab" aria-selected={view === 'lab'} className={`nav-tab ${view === 'lab' ? 'active' : ''}`} onClick={() => setView('lab')}>
+          <Icon.Pen /> Discursiva &amp; Erros
+        </button>
+        <button role="tab" aria-selected={view === 'notebooklm'} className={`nav-tab ${view === 'notebooklm' ? 'active' : ''}`} onClick={() => setView('notebooklm')}>
+          <Icon.Layers /> NotebookLM &amp; Histórico
+        </button>
       </nav>
 
       {dbError && (
-        <div style={{ padding: '12px 16px', background: 'var(--danger-soft)', borderBottom: '1px solid var(--danger)', fontSize: 12 }}>
-          <strong>Banco de dados não conectado:</strong> {dbError} — Configure <code>DATABASE_URL</code> (Neon) e <code>GEMINI_API_KEY</code> nas variáveis de ambiente da Vercel.
+        <div style={{ padding: '10px 20px', background: 'var(--danger-soft)', borderBottom: '1px solid var(--border)', fontSize: 12.5, color: 'var(--danger)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span><strong>Erro de conexão:</strong> {dbError}</span>
+          <button onClick={loadState} className="btn btn-sm">Tentar novamente</button>
         </div>
       )}
 
       <main className="main-area">
-        {/* VIEW 1: CHAT */}
+        {/* VIEW 1: MENTOR CHAT + SIDEBAR */}
         {view === 'chat' && (
           <section className="view-chat">
             <div className="chat-panel">
               <div className="chat-header">
-                <strong className="text-sm">Mentor de Estudos (Salva automaticamente no Neon)</strong>
+                <strong className="text-sm">Diário de Estudos Interativo</strong>
                 <button onClick={clearChat} className="btn btn-sm">Limpar conversa</button>
               </div>
 
               <div className="chat-messages">
                 {loading ? (
-                  <div className="text-xs muted">Carregando seu progresso do banco Neon...</div>
+                  <div className="space-y">
+                    <div className="skeleton" style={{ height: 52, width: '75%' }} />
+                    <div className="skeleton" style={{ height: 36, width: '45%', marginLeft: 'auto' }} />
+                    <div className="skeleton" style={{ height: 64, width: '80%' }} />
+                  </div>
                 ) : chat.length === 0 ? (
                   <div className="msg assistant">
-                    <p><strong>Olá! Sou seu Agente de Estudos para a Câmara Municipal de Cuiabá (Edital 001/2026).</strong></p>
-                    <p>Todo o seu progresso fica salvo no <strong>PostgreSQL do Neon</strong>. Você pode conversar comigo normalmente:</p>
+                    <p><strong>Sessão iniciada.</strong> Seu progresso está sincronizado com o banco de dados.</p>
+                    <p>Converse naturalmente para organizar o dia, tirar dúvidas ou registrar o que você fez:</p>
                     <ul>
-                      <li><em>&ldquo;O que vamos estudar hoje?&rdquo;</em> — eu analiso suas revisões vencidas e já monto sua fila.</li>
-                      <li><em>&ldquo;Estudei Atos Administrativos 45 min e acertei 17/20&rdquo;</em> — eu salvo os acertos e agendo sua revisão.</li>
-                      <li><em>&ldquo;Errei uma questão sobre quórum de 2/3 na LOM&rdquo;</em> — eu registro no Caderno de Erros e explico a regra.</li>
+                      <li><em>&ldquo;O que vamos estudar e revisar hoje?&rdquo;</em> — prioriza revisões vencidas e tópicos de maior peso.</li>
+                      <li><em>&ldquo;Estudei Atos Administrativos 45 min e acertei 17 de 20.&rdquo;</em> — registra acertos e agenda revisão.</li>
+                      <li><em>&ldquo;Errei uma questão sobre quórum de 2/3 na LOM.&rdquo;</em> — salva no Caderno de Erros.</li>
                     </ul>
                   </div>
                 ) : (
@@ -463,7 +618,7 @@ export default function HomePage() {
                       try { items = JSON.parse(m.content); } catch {}
                       return (
                         <div key={m.id} className="tool-trace">
-                          {items.map((it, idx) => <span key={idx} className="tool-chip">✓ {it}</span>)}
+                          {items.map((it, idx) => <span key={idx} className="tool-chip"><Icon.Check /> {it}</span>)}
                         </div>
                       );
                     }
@@ -474,14 +629,14 @@ export default function HomePage() {
                     );
                   })
                 )}
-                {chatBusy && <div className="msg assistant">Pensando e atualizando seu plano...</div>}
+                {chatBusy && <div className="msg assistant muted">Atualizando plano e registrando...</div>}
                 <div ref={chatEndRef} />
               </div>
 
               <div className="chat-suggestions">
                 <button className="chip-btn" onClick={() => sendMessage('Bom dia! O que vamos estudar e revisar hoje?')}>O que vamos estudar hoje?</button>
                 <button className="chip-btn" onClick={() => sendMessage('Tenho 1 hora disponível agora. Monte um bloco de estudo + revisão com foco nos dois cargos.')}>Tenho 1h agora</button>
-                <button className="chip-btn" onClick={() => sendMessage('Me faça um quiz rápido de 3 questões estilo Selecon sobre o tema que estou estudando.')}>Quiz Selecon (3q)</button>
+                <button className="chip-btn" onClick={() => sendMessage('Me faça um quiz de 3 questões estilo Selecon sobre o tema que estou estudando.')}>Quiz Selecon (3q)</button>
                 <button className="chip-btn" onClick={() => sendMessage('Quais são meus pontos mais fracos e erros registrados até agora?')}>Meus pontos fracos</button>
                 <button className="chip-btn" onClick={() => sendMessage('Me dê um tema provável de prova discursiva (20 a 30 linhas).')}>Treinar Discursiva</button>
               </div>
@@ -497,7 +652,7 @@ export default function HomePage() {
                       sendMessage();
                     }
                   }}
-                  placeholder="Converse com seu agente: 'O que estudamos hoje?', 'Fiz 16/20 em Atos Adm.'..."
+                  placeholder="Pergunte o que estudar hoje ou registre seu progresso..."
                 />
                 <button disabled={chatBusy} onClick={() => sendMessage()} className="btn btn-primary" style={{ minHeight: 40, padding: '0 16px' }}>
                   Enviar
@@ -506,12 +661,12 @@ export default function HomePage() {
             </div>
 
             <aside className="chat-sidebar">
-              <div className="panel">
-                <div className="panel-head">
-                  <span>Progresso nos 2 Cargos</span>
+              <div className="section-box">
+                <div className="section-head">
+                  <span>Cobertura nos Cargos</span>
                   <span className="text-xs muted">Acertos: {stats.acc}</span>
                 </div>
-                <div className="panel-body space-y">
+                <div className="section-body space-y">
                   <div>
                     <div className="flex-row" style={{ justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                       <span>Analista Leg. — TI</span>
@@ -530,16 +685,16 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="panel">
-                <div className="panel-head">
-                  <span>Timer de Foco</span>
+              <div className="section-box">
+                <div className="section-head">
+                  <span>Bloco de Foco</span>
                   <div className="flex-row" style={{ gap: 4 }}>
                     <button onClick={() => { setTimerRunning(false); setTimerInitial(50 * 60); setTimerSeconds(50 * 60); }} className="btn btn-sm">50m</button>
                     <button onClick={() => { setTimerRunning(false); setTimerInitial(25 * 60); setTimerSeconds(25 * 60); }} className="btn btn-sm">25m</button>
                     <button onClick={() => { setTimerRunning(false); setTimerInitial(15 * 60); setTimerSeconds(15 * 60); }} className="btn btn-sm">15m</button>
                   </div>
                 </div>
-                <div className="panel-body space-y">
+                <div className="section-body space-y">
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span className="mono" style={{ fontSize: 24, fontWeight: 600 }}>
                       {String(Math.floor(timerSeconds / 60)).padStart(2, '0')}:{String(timerSeconds % 60).padStart(2, '0')}
@@ -559,48 +714,50 @@ export default function HomePage() {
                       </button>
                     </div>
                   </div>
-                  <select className="field" value={timerTopicId} onChange={e => setTimerTopicId(e.target.value)} style={{ fontSize: 12 }}>
+                  <select aria-label="Tópico do timer" className="field" value={timerTopicId} onChange={e => setTimerTopicId(e.target.value)} style={{ fontSize: 12 }}>
                     {topics.map(t => <option key={t.id} value={t.id}>[{t.subject}] {t.title.slice(0, 50)}</option>)}
                   </select>
                 </div>
               </div>
 
-              <div className="panel">
-                <div className="panel-head">
+              <div className="section-box">
+                <div className="section-head">
                   <span>Para Estudar</span>
-                  <button onClick={() => setView('edital')} className="text-xs" style={{ color: 'var(--accent)' }}>+ Setar</button>
+                  <button onClick={() => setView('edital')} className="text-xs" style={{ color: 'var(--accent)', fontWeight: 600 }}>+ Gerenciar</button>
                 </div>
                 {studyQueue.length === 0 ? (
-                  <div className="panel-body text-xs muted">Vazio. Pergunte ao agente &ldquo;O que vamos estudar hoje?&rdquo;.</div>
+                  <div className="section-body text-xs muted">
+                    Nenhum tópico na fila. Pergunte ao mentor o que estudar hoje ou clique em + Gerenciar.
+                  </div>
                 ) : studyQueue.map(t => (
-                  <div key={t.id} className="queue-item">
+                  <div key={t.id} className="list-row">
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div className="text-xs muted">{t.subject}</div>
                       <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 500 }}>{t.title}</div>
                     </div>
-                    <button onClick={() => topicAction({ action: 'complete_study', id: t.id })} className="btn btn-primary btn-sm" title="Concluir e agendar revisão +1d">✓</button>
+                    <button onClick={() => topicAction({ action: 'complete_study', id: t.id })} className="btn btn-primary btn-sm" aria-label="Concluir estudo e agendar revisão"><Icon.Check /></button>
                   </div>
                 ))}
               </div>
 
-              <div className="panel">
-                <div className="panel-head">
+              <div className="section-box">
+                <div className="section-head">
                   <span>Revisões (1→3→7→15d)</span>
                   <span className="text-xs muted">{reviewQueue.length}</span>
                 </div>
                 {reviewQueue.length === 0 ? (
-                  <div className="panel-body text-xs muted">Sem revisões agendadas ainda.</div>
+                  <div className="section-body text-xs muted">Nenhuma revisão pendente no momento.</div>
                 ) : reviewQueue.slice(0, 6).map(t => {
                   const due = !t.next_review_date || t.next_review_date <= today;
                   return (
-                    <div key={t.id} className="queue-item">
+                    <div key={t.id} className="list-row">
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div className="text-xs" style={{ color: due ? 'var(--warn)' : 'var(--text-muted)' }}>
-                          {due ? 'Hoje' : fmtBR(t.next_review_date)} • Ciclo {t.review_interval || 1}d
+                          {due ? 'Revisar hoje' : fmtBR(t.next_review_date)} • Ciclo {t.review_interval || 1}d
                         </div>
                         <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</div>
                       </div>
-                      <button onClick={() => topicAction({ action: 'complete_review', id: t.id })} className="btn btn-sm">✓</button>
+                      <button onClick={() => topicAction({ action: 'complete_review', id: t.id })} className="btn btn-sm" aria-label="Marcar revisão como concluída"><Icon.Check /></button>
                     </div>
                   );
                 })}
@@ -612,31 +769,31 @@ export default function HomePage() {
         {/* VIEW 2: EDITAL CRUZADO */}
         {view === 'edital' && (
           <section className="view">
-            <div className="kpi-grid">
-              <div className="kpi-card">
-                <span className="kpi-lbl">Cobertura Analista TI</span>
-                <span className="kpi-val">{stats.anlPct}%</span>
-                <span className="text-xs muted">{stats.anlDone}/{stats.anlTotal} tópicos</span>
+            <div className="metrics-strip">
+              <div className="metric-cell">
+                <span className="metric-lbl">Analista Legislativo TI</span>
+                <span className="metric-val">{stats.anlPct}%</span>
+                <span className="text-xs muted">{stats.anlDone} de {stats.anlTotal} tópicos</span>
               </div>
-              <div className="kpi-card">
-                <span className="kpi-lbl">Cobertura Técnico Leg.</span>
-                <span className="kpi-val">{stats.tecPct}%</span>
-                <span className="text-xs muted">{stats.tecDone}/{stats.tecTotal} tópicos</span>
+              <div className="metric-cell">
+                <span className="metric-lbl">Técnico Legislativo</span>
+                <span className="metric-val">{stats.tecPct}%</span>
+                <span className="text-xs muted">{stats.tecDone} de {stats.tecTotal} tópicos</span>
               </div>
-              <div className="kpi-card">
-                <span className="kpi-lbl">Precisão em Questões</span>
-                <span className="kpi-val">{stats.acc}</span>
-                <span className="text-xs muted">{stats.qr} acertos / {stats.qt} feitas</span>
+              <div className="metric-cell">
+                <span className="metric-lbl">Taxa de Acertos</span>
+                <span className="metric-val">{stats.acc}</span>
+                <span className="text-xs muted">{stats.qr} certas de {stats.qt}</span>
               </div>
-              <div className="kpi-card">
-                <span className="kpi-lbl">Carga Única do Edital</span>
-                <span className="kpi-val">~980 págs</span>
-                <span className="text-xs muted">6 apostilas 100% idênticas entre cargos</span>
+              <div className="metric-cell">
+                <span className="metric-lbl">Tempo Líquido</span>
+                <span className="metric-val">{stats.hoursText}</span>
+                <span className="text-xs muted">~980 págs únicas no edital</span>
               </div>
             </div>
 
             <div className="filter-bar">
-              <input className="field" type="text" value={fSearch} onChange={e => setFSearch(e.target.value)} placeholder="Buscar tópico, lei ou termo..." />
+              <input className="field" type="text" value={fSearch} onChange={e => setFSearch(e.target.value)} placeholder="Buscar tópico, lei ou assunto..." />
               <select className="field" value={fOverlap} onChange={e => setFOverlap(e.target.value)}>
                 <option value="all">Cruzamento: Todos</option>
                 <option value="ambos-identico">100% Comum (2 Cargos)</option>
@@ -659,31 +816,33 @@ export default function HomePage() {
 
             <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
               <span className="text-xs muted">Exibindo {filteredTopics.length} de {topics.length} tópicos</span>
-              <button onClick={() => setShowCustomModal(true)} className="btn btn-primary btn-sm">+ Novo Tópico Personalizado</button>
+              <button onClick={() => setShowCustomModal(true)} className="btn btn-primary btn-sm">+ Novo Tópico</button>
             </div>
 
-            <div className="panel">
-              {filteredTopics.map(t => {
+            <div className="section-box">
+              {filteredTopics.length === 0 ? (
+                <div className="section-body text-xs muted">Nenhum tópico corresponde aos filtros selecionados.</div>
+              ) : filteredTopics.map(t => {
                 const sm = SUBJECT_META.find(s => s.name === t.subject) || { wAnl: '—', wTec: '—' };
                 const acc = t.q_total ? `${t.q_right}/${t.q_total}q (${Math.round((t.q_right / t.q_total) * 100)}%)` : '0q';
-                const pillCls = t.overlap === 'ambos-identico' ? 'ok' : t.overlap === 'ponte-peso' ? 'warn' : t.overlap === 'exclusivo-analista' ? 'info' : 'danger';
-                const pillTxt = t.overlap === 'ambos-identico' ? '100% Comum' : t.overlap === 'ponte-peso' ? 'Ponte / Ampliado' : t.overlap === 'exclusivo-analista' ? 'Exclusivo Analista TI' : 'Exclusivo Técnico';
+                const tagCls = t.overlap === 'ambos-identico' ? 'ok' : t.overlap === 'ponte-peso' ? 'warn' : t.overlap === 'exclusivo-analista' ? 'info' : 'danger';
+                const tagTxt = t.overlap === 'ambos-identico' ? '100% Comum' : t.overlap === 'ponte-peso' ? 'Ponte / Ampliado' : t.overlap === 'exclusivo-analista' ? 'Exclusivo Analista TI' : 'Exclusivo Técnico';
                 return (
-                  <div key={t.id} className="topic-row">
+                  <div key={t.id} className="list-row" style={{ flexWrap: 'wrap', padding: '12px 16px' }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div className="flex-row" style={{ gap: 6, marginBottom: 4 }}>
                         <strong className="text-xs">{t.subject}</strong>
-                        <span className={`pill ${pillCls}`} style={{ padding: '2px 7px', fontSize: 11 }}>{pillTxt}</span>
+                        <span className={`tag ${tagCls}`}>{tagTxt}</span>
                         <span className="text-xs muted">ANL: {sm.wAnl} • TEC: {sm.wTec} • Domínio {t.mastery}/5 • {acc}</span>
                       </div>
                       <div className="text-sm" style={{ fontWeight: 500 }}>{t.title}</div>
                     </div>
                     <div className="flex-row" style={{ gap: 6 }}>
                       <button onClick={() => topicAction({ action: 'toggle_study', id: t.id })} className={`btn btn-sm ${t.study_queue ? 'btn-primary' : ''}`}>
-                        {t.study_queue ? '✓ Estudar' : '+ Estudar'}
+                        {t.study_queue ? 'Na fila' : '+ Estudar'}
                       </button>
                       <button onClick={() => topicAction({ action: 'toggle_review', id: t.id })} className="btn btn-sm">
-                        {t.review_queue ? `↻ Rev ${fmtBR(t.next_review_date)}` : '+ Revisar'}
+                        {t.review_queue ? `Rev ${fmtBR(t.next_review_date)}` : '+ Revisar'}
                       </button>
                       <button onClick={() => setEditTopic({ ...t })} className="btn btn-sm">Editar</button>
                     </div>
@@ -698,16 +857,16 @@ export default function HomePage() {
         {view === 'lab' && (
           <section className="view">
             <div className="two-col">
-              <div className="panel">
-                <div className="panel-head">
-                  <span>Laboratório Discursiva (20 a 30 Linhas • 80/20)</span>
-                  <span className={`pill ${essayLines >= 20 && essayLines <= 30 ? 'ok' : ''}`}>{essayLines} / 30 linhas</span>
+              <div className="section-box">
+                <div className="section-head">
+                  <span>Prática Discursiva (20 a 30 Linhas • 80/20)</span>
+                  <span className={`tag ${essayLines >= 20 && essayLines <= 30 ? 'ok' : ''}`}>{essayLines} / 30 linhas</span>
                 </div>
-                <div className="panel-body space-y">
-                  <select className="field" value={essayId} onChange={e => setEssayId(e.target.value)}>
+                <div className="section-body space-y">
+                  <select aria-label="Tema da discursiva" className="field" value={essayId} onChange={e => setEssayId(e.target.value)}>
                     {ESSAY_PROMPTS.map(p => <option key={p.id} value={p.id}>[{p.cargo}] {p.title}</option>)}
                   </select>
-                  <div className="text-xs muted" style={{ padding: 10, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 7 }}>
+                  <div className="text-xs muted" style={{ padding: 10, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6 }}>
                     {ESSAY_PROMPTS.find(x => x.id === essayId)?.desc}
                   </div>
                   <textarea
@@ -715,18 +874,18 @@ export default function HomePage() {
                     rows={12}
                     value={essayText}
                     onChange={e => setEssayText(e.target.value)}
-                    placeholder="Escreva sua resposta (20 a 30 linhas) e peça para o Agente Gemini corrigir pela rubrica 80/20 do Edital..."
+                    placeholder="Redija sua resposta discursiva aqui (20 a 30 linhas)..."
                   />
                   <div className="flex-row" style={{ justifyContent: 'space-between' }}>
                     <span className="text-xs muted">{essayText.trim() ? essayText.trim().split(/\s+/).length : 0} palavras</span>
                     <div className="flex-row">
-                      <button onClick={correctEssayWithAgent} className="btn btn-primary btn-sm">Corrigir com Agente Gemini</button>
-                      <button onClick={saveEssay} className="btn btn-sm">Salvar no Neon</button>
+                      <button onClick={correctEssayWithAgent} className="btn btn-primary btn-sm">Corrigir com Mentor</button>
+                      <button onClick={saveEssay} className="btn btn-sm">Salvar Rascunho</button>
                     </div>
                   </div>
                   <div className="space-y">
                     {essays.map(e => (
-                      <div key={e.id} className="queue-item" style={{ border: '1px solid var(--border)', borderRadius: 6 }}>
+                      <div key={e.id} className="list-row" style={{ border: '1px solid var(--border)', borderRadius: 6 }}>
                         <span className="text-xs">[{e.cargo}] {e.title}</span>
                         <span className="text-xs muted">{fmtBR(e.date)}</span>
                       </div>
@@ -735,8 +894,8 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="panel">
-                <div className="panel-head">
+              <div className="section-box">
+                <div className="section-head">
                   <span>Caderno de Erros &amp; Lacunas</span>
                   <button
                     onClick={() => {
@@ -749,29 +908,31 @@ export default function HomePage() {
                     Exportar .MD
                   </button>
                 </div>
-                <div className="panel-body space-y">
+                <div className="section-body space-y">
                   <div className="two-col" style={{ gap: 8 }}>
-                    <select className="field" value={errSub} onChange={e => setErrSub(e.target.value)}>
+                    <select aria-label="Disciplina do erro" className="field" value={errSub} onChange={e => setErrSub(e.target.value)}>
                       {SUBJECT_META.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                     </select>
                     <input className="field" type="text" value={errTop} onChange={e => setErrTop(e.target.value)} placeholder="Assunto / Artigo de lei" />
                   </div>
-                  <input className="field" type="text" value={errMis} onChange={e => setErrMis(e.target.value)} placeholder="O que eu errei / pegadinha da Selecon..." />
+                  <input className="field" type="text" value={errMis} onChange={e => setErrMis(e.target.value)} placeholder="O que você errou ou confundiu..." />
                   <div className="flex-row">
                     <input className="field" style={{ flex: 1 }} type="text" value={errCor} onChange={e => setErrCor(e.target.value)} placeholder="Regra correta para memorizar..." />
                     <button onClick={addError} className="btn btn-primary btn-sm">Registrar</button>
                   </div>
+                  {errFormFeedback && <div className="inline-error">{errFormFeedback}</div>}
+
                   <div style={{ maxHeight: 380, overflowY: 'auto' }}>
                     {errors.length === 0 ? (
-                      <div className="text-xs muted" style={{ padding: '16px 0' }}>Nenhum erro registrado. Você também pode dizer no chat: <em>&ldquo;Errei uma questão sobre X&rdquo;</em> que o agente salva aqui!</div>
+                      <div className="text-xs muted" style={{ padding: '16px 0' }}>Nenhum erro registrado. Você também pode relatar seus erros direto no chat do Mentor.</div>
                     ) : errors.map(e => (
                       <div key={e.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                         <div className="flex-row" style={{ justifyContent: 'space-between' }}>
                           <strong className="text-xs">{e.subject} — {e.topic}</strong>
                           <button onClick={() => deleteError(e.id)} className="text-xs muted">Remover</button>
                         </div>
-                        <div className="text-xs" style={{ color: 'var(--danger)', marginTop: 3 }}>✗ {e.mistake}</div>
-                        <div className="text-xs" style={{ color: 'var(--accent)', marginTop: 2 }}>✓ {e.correction}</div>
+                        <div className="text-xs" style={{ color: 'var(--danger)', marginTop: 3 }}>Erro: {e.mistake}</div>
+                        <div className="text-xs" style={{ color: 'var(--accent)', marginTop: 2 }}>Regra: {e.correction}</div>
                       </div>
                     ))}
                   </div>
@@ -785,14 +946,14 @@ export default function HomePage() {
         {view === 'notebooklm' && (
           <section className="view">
             <div className="two-col">
-              <div className="panel">
-                <div className="panel-head"><span>Integração com Gemini Notebook / NotebookLM</span></div>
-                <div className="panel-body space-y">
+              <div className="section-box">
+                <div className="section-head"><span>Integração com NotebookLM</span></div>
+                <div className="section-body space-y">
                   <p className="text-xs muted" style={{ margin: 0 }}>
-                    As 3 pastas sem duplicatas já estão no seu Google Drive (<code>concurso camara/NotebookLM - Prontos para Importar/</code>).
+                    As 3 pastas organizadas sem duplicatas estão em <code>concurso camara/NotebookLM - Prontos para Importar/</code> no seu Google Drive.
                   </p>
                   <a href="https://drive.google.com/drive/folders/1RU85Ck3qASnCMvCL6TgH_V6_OmwoPNTR" target="_blank" rel="noopener" className="btn btn-primary" style={{ width: '100%', textDecoration: 'none' }}>
-                    Abrir Pasta Pronta no Google Drive
+                    Abrir Pasta no Google Drive
                   </a>
                   <button
                     onClick={() => {
@@ -807,41 +968,43 @@ export default function HomePage() {
                     className="btn"
                     style={{ width: '100%' }}
                   >
-                    Baixar Meu Progresso + Erros (.md) p/ NotebookLM
+                    Baixar Meu Progresso + Erros (.md)
                   </button>
 
-                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }} className="space-y">
-                    <strong className="text-xs">Gerador Rápido de Prompt p/ NotebookLM:</strong>
-                    <select className="field" value={nlmTopicId} onChange={e => setNlmTopicId(e.target.value)}>
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }} className="space-y">
+                    <strong className="text-xs">Gerador de Prompt para NotebookLM:</strong>
+                    <select aria-label="Tópico para prompt" className="field" value={nlmTopicId} onChange={e => setNlmTopicId(e.target.value)}>
                       {topics.map(t => <option key={t.id} value={t.id}>[{t.subject}] {t.title.slice(0, 55)}</option>)}
                     </select>
-                    <select className="field" value={nlmMode} onChange={e => setNlmMode(e.target.value)}>
+                    <select aria-label="Modo do prompt" className="field" value={nlmMode} onChange={e => setNlmMode(e.target.value)}>
                       <option value="podcast">Audio Overview (Podcast de Revisão)</option>
                       <option value="feynman">Explicação Feynman + Pegadinhas Selecon</option>
                       <option value="leiseca">Mapa de Prazos, Quóruns e Artigos</option>
                       <option value="quiz">Simulado 10 Questões Comentadas</option>
                     </select>
                     <textarea className="field mono" rows={5} readOnly value={nlmPromptText} />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(nlmPromptText);
-                        setNlmCopied('Copiado!');
-                        setTimeout(() => setNlmCopied(''), 2000);
-                      }}
-                      className="btn btn-sm"
-                    >
-                      Copiar Prompt
-                    </button>
-                    {nlmCopied && <span className="text-xs" style={{ color: 'var(--accent)', marginLeft: 8 }}>{nlmCopied}</span>}
+                    <div className="flex-row">
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(nlmPromptText);
+                          setNlmCopied('Prompt copiado.');
+                          setTimeout(() => setNlmCopied(''), 2000);
+                        }}
+                        className="btn btn-sm"
+                      >
+                        Copiar Prompt
+                      </button>
+                      {nlmCopied && <span className="text-xs" style={{ color: 'var(--accent)' }}>{nlmCopied}</span>}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="panel">
-                <div className="panel-head"><span>Histórico de Sessões (Neon Postgres)</span></div>
-                <div className="panel-body space-y">
+              <div className="section-box">
+                <div className="section-head"><span>Histórico de Sessões</span></div>
+                <div className="section-body space-y">
                   <button
-                    onClick={() => downloadFile(`backup_neon_cmc_${today}.json`, JSON.stringify({ topics, logs, errors, essays }, null, 2), 'application/json')}
+                    onClick={() => downloadFile(`backup_cmc_${today}.json`, JSON.stringify({ topics, logs, errors, essays }, null, 2), 'application/json')}
                     className="btn"
                   >
                     Exportar Backup JSON
@@ -850,7 +1013,7 @@ export default function HomePage() {
                     {logs.length === 0 ? (
                       <div className="text-xs muted">Nenhuma sessão registrada ainda.</div>
                     ) : logs.map(l => (
-                      <div key={l.id} className="queue-item">
+                      <div key={l.id} className="list-row">
                         <span className="text-xs"><strong>{l.subject}</strong> — {l.title.slice(0, 42)}</span>
                         <span className="text-xs muted">{fmtBR(l.date)} • {l.minutes}m • {l.kind}</span>
                       </div>
@@ -872,7 +1035,7 @@ export default function HomePage() {
                 <div className="text-xs muted">{editTopic.subject}</div>
                 <div className="text-sm">{editTopic.title}</div>
               </div>
-              <button onClick={() => setEditTopic(null)}>✕</button>
+              <button onClick={() => setEditTopic(null)} aria-label="Fechar modal">✕</button>
             </div>
             <div className="modal-body">
               <div className="two-col" style={{ gap: 10 }}>
@@ -923,7 +1086,7 @@ export default function HomePage() {
                 }}
                 className="btn btn-primary"
               >
-                Salvar no Neon
+                Salvar Alterações
               </button>
             </div>
           </div>
@@ -936,14 +1099,14 @@ export default function HomePage() {
           <div className="modal" style={{ maxWidth: 440 }}>
             <div className="modal-head">
               <span>Novo Tópico / Meta</span>
-              <button onClick={() => setShowCustomModal(false)}>✕</button>
+              <button onClick={() => setShowCustomModal(false)} aria-label="Fechar modal">✕</button>
             </div>
             <div className="modal-body">
-              <select className="field" value={ncSubject} onChange={e => setNcSubject(e.target.value)}>
+              <select aria-label="Disciplina" className="field" value={ncSubject} onChange={e => setNcSubject(e.target.value)}>
                 {SUBJECT_META.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
               </select>
               <input className="field" type="text" value={ncTitle} onChange={e => setNcTitle(e.target.value)} placeholder="Ex: Lei Seca LC 93/2003 ou Simulado #1" />
-              <select className="field" value={ncOverlap} onChange={e => setNcOverlap(e.target.value)}>
+              <select aria-label="Abrangência" className="field" value={ncOverlap} onChange={e => setNcOverlap(e.target.value)}>
                 <option value="ambos-identico">Comum aos 2 Cargos</option>
                 <option value="exclusivo-analista">Exclusivo Analista TI</option>
                 <option value="exclusivo-tecnico">Exclusivo Técnico</option>

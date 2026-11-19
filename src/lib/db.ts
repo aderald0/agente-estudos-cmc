@@ -16,6 +16,23 @@ export async function ensureSchema() {
   const sql = getSql();
 
   await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS auth_rate_limits (
+      key TEXT PRIMARY KEY,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      locked_until TIMESTAMPTZ
+    )
+  `;
+
+  await sql`
     CREATE TABLE IF NOT EXISTS topics (
       id TEXT PRIMARY KEY,
       subject TEXT NOT NULL,
@@ -98,7 +115,6 @@ export async function ensureSchema() {
 }
 
 export function todayISO() {
-  // Cuiabá-MT timezone (America/Cuiaba = UTC-4)
   const now = new Date();
   const mt = new Date(now.toLocaleString('en-US', { timeZone: 'America/Cuiaba' }));
   const y = mt.getFullYear();
@@ -111,11 +127,4 @@ export function addDaysISO(baseISO: string, days: number) {
   const dt = new Date(baseISO + 'T12:00:00');
   dt.setDate(dt.getDate() + days);
   return dt.toISOString().slice(0, 10);
-}
-
-export function checkPin(req: Request): boolean {
-  const pin = process.env.APP_ACCESS_PIN?.trim();
-  if (!pin) return true;
-  const provided = req.headers.get('x-app-pin')?.trim() || '';
-  return provided === pin;
 }

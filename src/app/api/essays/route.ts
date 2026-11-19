@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import { checkPin, ensureSchema, getSql, todayISO } from '../../../lib/db';
+import { getCurrentSession, verifySameOrigin } from '../../../lib/auth';
+import { ensureSchema, getSql, todayISO } from '../../../lib/db';
 
 export async function POST(req: Request) {
-  if (!checkPin(req)) return NextResponse.json({ error: 'PIN inválido' }, { status: 401 });
+  if (!verifySameOrigin(req)) return NextResponse.json({ error: 'Origem não autorizada' }, { status: 403 });
+  const session = await getCurrentSession();
+  if (!session) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
   try {
     await ensureSchema();
     const sql = getSql();
