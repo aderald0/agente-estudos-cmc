@@ -325,90 +325,63 @@ export default function HomePage() {
   }
 
   return (
-    <div className="saas-shell">
-      {/* DESKTOP COLLAPSIBLE SIDEBAR */}
-      <aside className={`saas-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
-        <div className="sidebar-top">
-          <div className="sidebar-brand">
-            <div className="brand-id">
-              <div className="brand-icon"><Icons.Logo /></div>
-              <div className="hide-collapsed">
-                <div className="brand-name">Estudos CMC</div>
-                <div className="brand-tag">Edital 001/2026</div>
+    <div className="pierre-shell">
+      {/* PIERRE FLOATING GLASS HEADER & CENTERED PILL SWITCHER */}
+      <div className="pierre-topbar-wrap">
+        <header className="pierre-topbar">
+          <div className="brand-id">
+            <div className="brand-icon"><Icons.Logo size={17} /></div>
+            <div>
+              <div className="brand-name">Pierre · CMC 26</div>
+              <div className="brand-tag">
+                <span className="pierre-live-dot" />
+                <span>{daysLeft}d até 20/12 · {overallPct}%</span>
               </div>
             </div>
-            <button
-              onClick={() => setSidebarCollapsed(c => !c)}
-              className="ds-icon-btn hide-collapsed"
-              aria-label="Recolher menu"
-              title="Recolher menu"
-            >
-              <Icons.SidebarToggle size={16} />
-            </button>
           </div>
 
-          <nav className="sidebar-nav" aria-label="Navegação principal">
-            <button className={`side-link ${tab === 'hoje' ? 'active' : ''}`} onClick={() => setTab('hoje')}>
-              <Icons.Home /> <span className="hide-collapsed">Hoje</span>
+          <nav className="pierre-nav-dock" aria-label="Navegação principal">
+            <button className={`pierre-nav-pill ${tab === 'hoje' ? 'active' : ''}`} onClick={() => setTab('hoje')}>
+              <Icons.Home size={15} /> <span>Hoje</span>
             </button>
-            <button className={`side-link ${tab === 'pratica' ? 'active' : ''}`} onClick={() => setTab('pratica')}>
-              <Icons.Check /> <span className="hide-collapsed">Questões &amp; Cards</span>
+            <button className={`pierre-nav-pill ${tab === 'pratica' ? 'active' : ''}`} onClick={() => setTab('pratica')}>
+              <Icons.Check size={15} /> <span>Prática</span>
             </button>
-            <button className={`side-link ${tab === 'mentor' ? 'active' : ''}`} onClick={() => setTab('mentor')}>
-              <Icons.Sparkles /> <span className="hide-collapsed">Mentor</span>
+            <button className={`pierre-nav-pill ${tab === 'mentor' ? 'active' : ''}`} onClick={() => setTab('mentor')}>
+              <Icons.Sparkles size={15} /> <span>Mentor</span>
             </button>
-            <button className={`side-link ${tab === 'edital' ? 'active' : ''}`} onClick={() => setTab('edital')}>
-              <Icons.BookOpen /> <span className="hide-collapsed">Edital</span>
+            <button className={`pierre-nav-pill ${tab === 'edital' ? 'active' : ''}`} onClick={() => setTab('edital')}>
+              <Icons.BookOpen size={15} /> <span>Edital</span>
             </button>
-            <button className={`side-link ${tab === 'caderno' ? 'active' : ''}`} onClick={() => setTab('caderno')}>
-              <Icons.FileText /> <span className="hide-collapsed">Caderno</span>
+            <button className={`pierre-nav-pill ${tab === 'caderno' ? 'active' : ''}`} onClick={() => setTab('caderno')}>
+              <Icons.FileText size={15} /> <span>Caderno</span>
             </button>
           </nav>
-        </div>
-
-        <div className="sidebar-bottom">
-          <div className="side-mini-stats hide-collapsed">
-            <div className="flex-row" style={{ justifyContent: 'space-between', fontSize: 12 }}>
-              <span className="muted">Progresso Geral</span>
-              <strong>{overallPct}%</strong>
-            </div>
-            <div className="ds-progress"><div className="ds-progress-fill green" style={{ width: `${overallPct}%` }} /></div>
-            <div className="text-xs muted">{daysLeft} dias para a prova</div>
-          </div>
-
-          <div className="side-user-row">
-            <div className="flex-row" style={{ minWidth: 0 }}>
-              <span className="user-avatar">{(username || 'A')[0].toUpperCase()}</span>
-              <span className="text-xs hide-collapsed" style={{ fontWeight: 600 }}>{username || 'Candidato'}</span>
-            </div>
-            <button onClick={handleLogout} className="ds-icon-btn hide-collapsed" aria-label="Sair" title="Sair">
-              <Icons.Logout />
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* MAIN AREA */}
-      <div className="saas-main-wrap">
-        <header className="saas-topbar">
-          <div className="topbar-left">
-            {sidebarCollapsed && (
-              <button onClick={() => setSidebarCollapsed(false)} className="ds-icon-btn" aria-label="Expandir menu">
-                <Icons.SidebarToggle size={16} />
-              </button>
-            )}
-            <h1 className="topbar-heading">{tabTitles[tab]}</h1>
-          </div>
 
           <div className="topbar-right">
-            <span className="ds-badge ds-badge-indigo">{daysLeft}d até 20/12</span>
+            {!isInstalledPwa && (
+              <button
+                onClick={handleInstallClick}
+                className="ds-btn ds-btn-secondary ds-btn-sm"
+                title="Instalar aplicativo no celular ou computador"
+              >
+                <Icons.Smartphone size={14} /> <span className="hide-mobile">Instalar App</span>
+              </button>
+            )}
+            <div className="user-pill hide-mobile">
+              <span className="user-avatar">{(username || 'A')[0].toUpperCase()}</span>
+              <span>{username || 'Candidato'}</span>
+            </div>
             <button onClick={toggleTheme} className="ds-icon-btn" aria-label="Alternar tema"><Icons.SunMoon /></button>
             <button onClick={handleLogout} className="ds-icon-btn" aria-label="Sair" title="Sair"><Icons.Logout /></button>
           </div>
         </header>
+      </div>
 
+      {/* MAIN AREA */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {dbError && (
-          <div className="inline-alert error" style={{ margin: '12px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="inline-alert error" style={{ maxWidth: 1112, margin: '8px auto 0', width: 'calc(100% - 48px)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{dbError}</span>
             <button onClick={loadState} className="ds-btn ds-btn-secondary ds-btn-sm">Recarregar</button>
           </div>

@@ -164,6 +164,66 @@ export function TodayDashboard({
 
   return (
     <div className="ds-container">
+      {/* 0. PIERRE EDITORIAL HERO & LIVE AGENT INSIGHT STRIP */}
+      <section className="pierre-hero">
+        <div className="pierre-hero-top">
+          <div>
+            <div className="pierre-eyebrow">
+              <span className="pierre-live-dot" />
+              <span>Seus agentes trabalhando pela sua aprovação · Instituto Selecon</span>
+            </div>
+            <h1 className="pierre-hero-title">Você foca na leitura. O Mentor organiza sua nota.</h1>
+          </div>
+          <div className="flex-row">
+            <button onClick={() => onNavigate('pratica')} className="ds-btn ds-btn-secondary">
+              <Icons.Check size={15} /> Banco 200 Questões
+            </button>
+            <button onClick={onAskMentorPlan} className="ds-btn ds-btn-primary">
+              <Icons.Sparkles size={15} /> Pedir plano ao Mentor
+            </button>
+          </div>
+        </div>
+
+        <div className="pierre-agents-strip">
+          <div className="pierre-agent-pill">
+            <div className="flex-row" style={{ gap: 10 }}>
+              <span className="agent-dot-avatar">TI</span>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>Manhã · Analista de TI</div>
+                <div className="text-xs muted">Legislação + TI valem 70% da prova (peso 1,75)</div>
+              </div>
+            </div>
+            <span className="ds-badge ds-badge-green">{readiness.anlScore} pts</span>
+          </div>
+
+          <div className="pierre-agent-pill">
+            <div className="flex-row" style={{ gap: 10 }}>
+              <span className="agent-dot-avatar">TL</span>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>Tarde · Técnico Legislativo</div>
+                <div className="text-xs muted">Adm. Pública + Específicos valem 70% (peso 1,75)</div>
+              </div>
+            </div>
+            <span className="ds-badge ds-badge-green">{readiness.tecScore} pts</span>
+          </div>
+
+          <div className="pierre-agent-pill">
+            <div className="flex-row" style={{ gap: 10 }}>
+              <span className="agent-dot-avatar">SRS</span>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>Memória &amp; Revisão Espaçada</div>
+                <div className="text-xs muted">
+                  {dueReviews.length > 0 ? `${dueReviews.length} revisão(ões) pendente(s) hoje` : 'Ciclo 1→3→7→15 dias em dia'}
+                </div>
+              </div>
+            </div>
+            <span className={`ds-badge ${dueReviews.length > 0 ? 'ds-badge-amber' : 'ds-badge-neutral'}`}>
+              {dueReviews.length} hoje
+            </span>
+          </div>
+        </div>
+      </section>
+
       {/* 1. CABEÇALHO DE DESEMPENHO */}
       <div className="kpi-bento">
         <div className="kpi-tile">
