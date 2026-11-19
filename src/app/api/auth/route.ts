@@ -54,15 +54,23 @@ export async function POST(req: Request) {
     const password = String(body.password || '');
 
     if (action === 'setup') {
-      const countRows = await sql`SELECT COUNT(*)::int AS cnt FROM users`;
-      if ((countRows[0]?.cnt ?? 0) > 0) {
-        return NextResponse.json({ error: 'Cadastro inicial já foi concluído. Faça login.' }, { status: 403 });
-      }
       if (username.length < 3 || username.length > 40 || !/^[a-z0-9._-]+$/.test(username)) {
         return NextResponse.json({ error: 'Usuário deve ter 3–40 caracteres (letras, números, ponto ou traço).' }, { status: 400 });
       }
       if (password.length < 8) {
         return NextResponse.json({ error: 'A senha deve ter pelo menos 8 caracteres.' }, { status: 400 });
+      }
+
+      const existing = await sql`SELECT id, username, password_hash FROM users WHERE username = ${username}`;
+      if (existing[0]) {
+        const valid = verifyPassword(password, String(existing[0].password_hash));
+        if (!valid) {
+          return NextResponse.json({ error: 'Este usuário já existe. Digite a senha correta ou escolha outro nome de usuário.' }, { status: 409 });
+        }
+        const token = signSessionToken(Number(existing[0].id), String(existing[0].username));
+        const res = NextResponse.json({ ok: true, username: existing[0].username, isFirstAccess: true });
+        res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+        return res;
       }
 
       const pwHash = hashPassword(password);
@@ -73,7 +81,7 @@ export async function POST(req: Request) {
       `;
       const user = inserted[0];
       const token = signSessionToken(Number(user.id), String(user.username));
-      const res = NextResponse.json({ ok: true, username: user.username });
+      const res = NextResponse.json({ ok: true, username: user.username, isFirstAccess: true });
       res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
       return res;
     }

@@ -39,6 +39,7 @@ export default function HomePage() {
 
   const [authChecked, setAuthChecked] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
+  const [authMode, setAuthMode] = useState<'setup' | 'login'>('setup');
   const [authenticated, setAuthenticated] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [authUser, setAuthUser] = useState('');
@@ -114,14 +115,23 @@ export default function HomePage() {
   const checkAuth = useCallback(async () => {
     try {
       const savedPlan = typeof window !== 'undefined' ? localStorage.getItem('pierre_active_plan') || DEFAULT_PLAN_ID : DEFAULT_PLAN_ID;
+      const firstAccessSeen = typeof window !== 'undefined' ? localStorage.getItem('pierre_first_access_v1') === '1' : true;
       setActivePlanId(savedPlan);
       const res = await fetch('/api/auth', { credentials: 'same-origin' });
       const data = await res.json();
-      setNeedsSetup(Boolean(data.needsSetup));
+      const isSetup = Boolean(data.needsSetup);
+      setNeedsSetup(isSetup);
+      setAuthMode(isSetup ? 'setup' : 'login');
       setAuthenticated(Boolean(data.authenticated));
       setUsername(data.username || null);
-      if (data.authenticated) await loadState(savedPlan);
-      else setLoading(false);
+      if (data.authenticated) {
+        if (!firstAccessSeen) {
+          setShowNewStudySetup(true);
+        }
+        await loadState(savedPlan);
+      } else {
+        setLoading(false);
+      }
     } catch {
       setDbError('Não foi possível verificar autenticação.');
       setLoading(false);
@@ -188,13 +198,13 @@ export default function HomePage() {
     e.preventDefault();
     setAuthError('');
     setAuthSubmitting(true);
-    const wasFirstSetup = needsSetup;
+    const openOnboardingAfter = authMode === 'setup' || needsSetup;
     try {
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ action: needsSetup ? 'setup' : 'login', username: authUser, password: authPass }),
+        body: JSON.stringify({ action: authMode, username: authUser, password: authPass }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -206,8 +216,7 @@ export default function HomePage() {
       setAuthenticated(true);
       setUsername(data.username);
       await loadState(activePlanId);
-      // On very first registration, open the conversational study setup screen right away
-      if (wasFirstSetup) {
+      if (openOnboardingAfter || data.isFirstAccess || localStorage.getItem('pierre_first_access_v1') !== '1') {
         setShowNewStudySetup(true);
       }
     } catch {
@@ -341,6 +350,7 @@ export default function HomePage() {
   }
 
   if (!authenticated) {
+    const isRegister = authMode === 'setup';
     return (
       <div className="auth-screen">
         <form onSubmit={handleAuthSubmit} className="auth-panel space-y">
@@ -348,18 +358,23 @@ export default function HomePage() {
             <div className="flex-row" style={{ gap: 10 }}>
               <span className="brand-icon"><Icons.Logo size={17} /></span>
               <div>
-                <h1 style={{ fontSize: 17 }}>{needsSetup ? 'Criar sua conta' : 'Pierre · Estudos'}</h1>
+                <h1 style={{ fontSize: 17 }}>Pierre</h1>
                 <div className="text-xs muted">Organização inteligente de estudos</div>
               </div>
             </div>
             <button type="button" onClick={toggleTheme} className="ds-icon-btn" aria-label="Alternar tema"><Icons.SunMoon /></button>
           </div>
 
-          <p className="text-xs muted" style={{ margin: 0 }}>
-            {needsSetup
-              ? 'Crie seu usuário e senha. Em seguida, você poderá anexar seu edital, ementa da faculdade ou apostila para montar sua programação.'
-              : 'Entre com suas credenciais para acessar seus estudos, questões e revisões.'}
-          </p>
+          <div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
+              {isRegister ? 'Crie sua conta' : 'Entrar na sua conta'}
+            </h2>
+            <p className="text-xs muted" style={{ margin: 0 }}>
+              {isRegister
+                ? 'Seus estudos, materiais e revisões em um só lugar.'
+                : 'Entre com suas credenciais para acessar seus estudos.'}
+            </p>
+          </div>
 
           <div>
             <label htmlFor="auth-u" className="field-label">Usuário</label>
@@ -367,15 +382,39 @@ export default function HomePage() {
           </div>
 
           <div>
-            <label htmlFor="auth-p" className="field-label">Senha {needsSetup && '(mín. 8 caracteres)'}</label>
-            <input id="auth-p" type="password" required minLength={needsSetup ? 8 : 1} autoComplete={needsSetup ? 'new-password' : 'current-password'} className="ds-input" value={authPass} onChange={e => setAuthPass(e.target.value)} placeholder="••••••••" />
+            <label htmlFor="auth-p" className="field-label">Senha {isRegister && '(mín. 8 caracteres)'}</label>
+            <input id="auth-p" type="password" required minLength={isRegister ? 8 : 1} autoComplete={isRegister ? 'new-password' : 'current-password'} className="ds-input" value={authPass} onChange={e => setAuthPass(e.target.value)} placeholder="••••••••" />
           </div>
 
           {authError && <div className="inline-alert error">{authError}</div>}
 
-          <button type="submit" disabled={authSubmitting} className="ds-btn ds-btn-primary" style={{ width: '100%' }}>
-            {authSubmitting ? 'Autenticando...' : (needsSetup ? 'Continuar' : 'Entrar')}
+          <button type="submit" disabled={authSubmitting} className="ds-btn ds-btn-primary" style={{ width: '100%', height: 42 }}>
+            {authSubmitting ? 'Autenticando...' : (isRegister ? 'Continuar' : 'Entrar')}
           </button>
+
+          <div
+            className="flex-row"
+            style={{
+              justifyContent: 'space-between',
+              paddingTop: 10,
+              borderTop: '1px solid var(--c-border)',
+              fontSize: 12,
+            }}
+          >
+            <span className="muted">
+              {isRegister ? 'Já tem estudo configurado?' : 'Quer configurar um novo estudo?'}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthError('');
+                setAuthMode(isRegister ? 'login' : 'setup');
+              }}
+              style={{ fontWeight: 600, color: 'var(--c-text)' }}
+            >
+              {isRegister ? 'Entrar direto →' : 'Criar conta / 1º acesso →'}
+            </button>
+          </div>
 
           {!isInstalledPwa && (
             <button
@@ -400,8 +439,12 @@ export default function HomePage() {
           <NewStudyView
             username={username}
             hasExistingPlans={plans.length > 0}
-            onCancel={() => setShowNewStudySetup(false)}
+            onCancel={() => {
+              localStorage.setItem('pierre_first_access_v1', '1');
+              setShowNewStudySetup(false);
+            }}
             onPlanCreated={async newPlanId => {
+              localStorage.setItem('pierre_first_access_v1', '1');
               setShowNewStudySetup(false);
               setActivePlanId(newPlanId);
               localStorage.setItem('pierre_active_plan', newPlanId);
