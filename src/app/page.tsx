@@ -82,24 +82,26 @@ function renderFormattedText(md: string) {
 }
 
 const Icon = {
+  Home: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  Book: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>,
   Chat: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
-  Today: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
-  List: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
-  More: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>,
+  Note: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
+  Play: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
   Send: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
+  Chevron: ({ open }: { open: boolean }) => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }}><polyline points="6 9 12 15 18 9"/></svg>
+  ),
   Lock: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
-  Check: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
   Theme: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M2 12h2"/><path d="M20 12h2"/></svg>,
   Logout: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
 };
 
 export default function HomePage() {
-  const [view, setView] = useState<'chat' | 'hoje' | 'edital' | 'mais'>('chat');
+  const [view, setView] = useState<'hoje' | 'materias' | 'mentor' | 'caderno'>('hoje');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [authChecked, setAuthChecked] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
-  const [username, setUsername] = useState<string | null>(null);
 
   const [authUser, setAuthUser] = useState('');
   const [authPass, setAuthPass] = useState('');
@@ -114,35 +116,33 @@ export default function HomePage() {
   const [essays, setEssays] = useState<EssayEntry[]>([]);
   const [chat, setChat] = useState<ChatMsg[]>([]);
 
+  // Active Study Sheet (Modal focado para estudar 1 tópico com Timer + Questões)
+  const [activeTopic, setActiveTopic] = useState<Topic | null>(null);
+  const [sheetSeconds, setSheetSeconds] = useState(40 * 60);
+  const [sheetRunning, setSheetRunning] = useState(false);
+  const [sheetQRight, setSheetQRight] = useState(0);
+  const [sheetQTotal, setSheetQTotal] = useState(0);
+  const [sheetMastery, setSheetMastery] = useState(3);
+  const [sheetNotes, setSheetNotes] = useState('');
+
+  // Accordion das 10 matérias
+  const [openSubject, setOpenSubject] = useState<string | null>(SUBJECT_META[6].name);
+  const [subjectSearch, setSubjectSearch] = useState('');
+
+  // Mentor Chat
   const [chatInput, setChatInput] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const [fSearch, setFSearch] = useState('');
-  const [fOverlap, setFOverlap] = useState('all');
-  const [fSubject, setFSubject] = useState('all');
-
-  const [timerInitial, setTimerInitial] = useState(50 * 60);
-  const [timerSeconds, setTimerSeconds] = useState(50 * 60);
-  const [timerRunning, setTimerRunning] = useState(false);
-  const [timerTopicId, setTimerTopicId] = useState('');
-
-  const [editTopic, setEditTopic] = useState<Topic | null>(null);
-  const [showCustomModal, setShowCustomModal] = useState(false);
-  const [ncSubject, setNcSubject] = useState(SUBJECT_META[0].name);
-  const [ncTitle, setNcTitle] = useState('');
-  const [ncOverlap, setNcOverlap] = useState('ambos-identico');
-  const [ncStudy, setNcStudy] = useState(true);
-
-  const [maisTab, setMaisTab] = useState<'erros' | 'discursiva' | 'notebooklm'>('erros');
+  // Caderno (Erros / Discursiva / NotebookLM)
+  const [cadernoTab, setCadernoTab] = useState<'erros' | 'discursiva' | 'notebooklm'>('erros');
   const [essayId, setEssayId] = useState(ESSAY_PROMPTS[0].id);
   const [essayText, setEssayText] = useState('');
   const [errSub, setErrSub] = useState(SUBJECT_META[0].name);
   const [errTop, setErrTop] = useState('');
   const [errMis, setErrMis] = useState('');
   const [errCor, setErrCor] = useState('');
-  const [errFormFeedback, setErrFormFeedback] = useState('');
-
+  const [errMsg, setErrMsg] = useState('');
   const [nlmTopicId, setNlmTopicId] = useState('');
   const [nlmMode, setNlmMode] = useState('podcast');
   const [nlmCopied, setNlmCopied] = useState('');
@@ -151,28 +151,18 @@ export default function HomePage() {
     setLoading(true);
     try {
       const res = await fetch('/api/state', { credentials: 'same-origin' });
-      if (res.status === 401) {
-        setAuthenticated(false);
-        setLoading(false);
-        return;
-      }
+      if (res.status === 401) { setAuthenticated(false); setLoading(false); return; }
       const data = await res.json();
-      if (!res.ok) {
-        setDbError(data.error || 'Falha ao carregar dados.');
-        return;
-      }
+      if (!res.ok) { setDbError(data.error || 'Erro ao carregar.'); return; }
       setDbError('');
       setTopics(data.topics || []);
       setLogs(data.logs || []);
       setErrors(data.errors || []);
       setEssays(data.essays || []);
       setChat(data.chat || []);
-      if (data.topics?.length) {
-        setTimerTopicId(prev => prev || data.topics[0].id);
-        setNlmTopicId(prev => prev || data.topics[0].id);
-      }
+      if (data.topics?.length) setNlmTopicId(prev => prev || data.topics[0].id);
     } catch (e) {
-      setDbError(e instanceof Error ? e.message : 'Erro de conexão');
+      setDbError(e instanceof Error ? e.message : 'Erro de rede');
     } finally {
       setLoading(false);
     }
@@ -184,11 +174,10 @@ export default function HomePage() {
       const data = await res.json();
       setNeedsSetup(Boolean(data.needsSetup));
       setAuthenticated(Boolean(data.authenticated));
-      setUsername(data.username || null);
       if (data.authenticated) await loadState();
       else setLoading(false);
     } catch {
-      setDbError('Não foi possível verificar autenticação.');
+      setDbError('Falha ao conectar ao servidor.');
       setLoading(false);
     } finally {
       setAuthChecked(true);
@@ -196,9 +185,9 @@ export default function HomePage() {
   }, [loadState]);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('cmc_theme') === 'dark' ? 'dark' : 'light';
-    setTheme(savedTheme);
-    document.body.classList.toggle('dark', savedTheme === 'dark');
+    const saved = localStorage.getItem('cmc_theme') === 'dark' ? 'dark' : 'light';
+    setTheme(saved);
+    document.body.classList.toggle('dark', saved === 'dark');
     checkAuth();
   }, [checkAuth]);
 
@@ -207,12 +196,12 @@ export default function HomePage() {
   }, [chat, chatBusy]);
 
   useEffect(() => {
-    if (!timerRunning) return;
+    if (!sheetRunning) return;
     const id = setInterval(() => {
-      setTimerSeconds(s => (s <= 1 ? (setTimerRunning(false), 0) : s - 1));
+      setSheetSeconds(s => (s <= 1 ? (setSheetRunning(false), 0) : s - 1));
     }, 1000);
     return () => clearInterval(id);
-  }, [timerRunning]);
+  }, [sheetRunning]);
 
   const toggleTheme = () => {
     const next = theme === 'light' ? 'dark' : 'light';
@@ -233,39 +222,22 @@ export default function HomePage() {
         body: JSON.stringify({ action: needsSetup ? 'setup' : 'login', username: authUser, password: authPass }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setAuthError(data.error || 'Falha na autenticação.');
-        return;
-      }
-      setAuthPass('');
-      setNeedsSetup(false);
-      setAuthenticated(true);
-      setUsername(data.username);
+      if (!res.ok) { setAuthError(data.error || 'Falha ao entrar.'); return; }
+      setAuthPass(''); setNeedsSetup(false); setAuthenticated(true);
       await loadState();
     } catch {
-      setAuthError('Erro de rede ao tentar autenticar.');
+      setAuthError('Erro de rede.');
     } finally {
       setAuthSubmitting(false);
     }
   }
 
   async function handleLogout() {
-    await fetch('/api/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ action: 'logout' }),
-    });
+    await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ action: 'logout' }) });
     setAuthenticated(false);
-    setUsername(null);
-    setTopics([]);
-    setChat([]);
   }
 
-  const daysLeft = useMemo(() => {
-    const exam = new Date(`${EXAM_DATE}T08:00:00`);
-    return Math.max(0, Math.ceil((exam.getTime() - Date.now()) / 86400000));
-  }, []);
+  const daysLeft = useMemo(() => Math.max(0, Math.ceil((new Date(`${EXAM_DATE}T08:00:00`).getTime() - Date.now()) / 86400000)), []);
 
   const stats = useMemo(() => {
     const anl = topics.filter(t => t.overlap !== 'exclusivo-tecnico');
@@ -283,26 +255,74 @@ export default function HomePage() {
   }, [topics]);
 
   const studyQueue = useMemo(() => topics.filter(t => t.study_queue), [topics]);
-  const reviewQueue = useMemo(
-    () => topics.filter(t => t.review_queue).sort((a, b) => (a.next_review_date || '').localeCompare(b.next_review_date || '')),
-    [topics]
+  const today = new Date().toISOString().slice(0, 10);
+  const dueReviews = useMemo(
+    () => topics.filter(t => t.review_queue && (!t.next_review_date || t.next_review_date <= today)),
+    [topics, today]
+  );
+  const futureReviews = useMemo(
+    () => topics.filter(t => t.review_queue && t.next_review_date > today).sort((a, b) => a.next_review_date.localeCompare(b.next_review_date)),
+    [topics, today]
   );
 
-  const filteredTopics = useMemo(() => {
-    const q = fSearch.toLowerCase();
-    return topics.filter(t => {
-      if (q && !`${t.title} ${t.subject} ${t.notes}`.toLowerCase().includes(q)) return false;
-      if (fOverlap === 'ponte-peso' && t.overlap !== 'ponte-peso' && t.overlap !== 'ambos-ampliado') return false;
-      else if (fOverlap !== 'all' && fOverlap !== 'ponte-peso' && t.overlap !== fOverlap) return false;
-      if (fSubject !== 'all' && t.subject !== fSubject) return false;
-      return true;
-    });
-  }, [topics, fSearch, fOverlap, fSubject]);
+  function openStudySheet(t: Topic) {
+    setActiveTopic(t);
+    setSheetSeconds(40 * 60);
+    setSheetRunning(false);
+    setSheetQRight(t.q_right || 0);
+    setSheetQTotal(t.q_total || 0);
+    setSheetMastery(t.mastery || 3);
+    setSheetNotes(t.notes || '');
+  }
 
-  async function sendMessage(overrideText?: string) {
+  async function saveStudySheet(completeAndScheduleReview: boolean) {
+    if (!activeTopic) return;
+    const elapsedMin = Math.max(5, Math.round((40 * 60 - sheetSeconds) / 60) || 25);
+    await fetch('/api/topics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        action: 'update',
+        id: activeTopic.id,
+        study_queue: completeAndScheduleReview ? false : activeTopic.study_queue,
+        review_queue: completeAndScheduleReview ? true : activeTopic.review_queue,
+        next_review_date: completeAndScheduleReview ? undefined : activeTopic.next_review_date,
+        review_interval: completeAndScheduleReview ? 1 : activeTopic.review_interval,
+        mastery: sheetMastery,
+        q_right: sheetQRight,
+        q_total: sheetQTotal,
+        notes: sheetNotes,
+      }),
+    });
+    if (completeAndScheduleReview) {
+      await fetch('/api/topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ action: 'log_timer', id: activeTopic.id, minutes: elapsedMin }),
+      });
+    }
+    setSheetRunning(false);
+    setActiveTopic(null);
+    await loadState();
+  }
+
+  async function topicAction(payload: Record<string, unknown>) {
+    await fetch('/api/topics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload),
+    });
+    await loadState();
+  }
+
+  async function sendMessage(overrideText?: string, goToMentor = false) {
     const text = (overrideText ?? chatInput).trim();
     if (!text || chatBusy) return;
     if (!overrideText) setChatInput('');
+    if (goToMentor) setView('mentor');
 
     setChat(prev => [...prev, { id: Date.now(), role: 'user', content: text }]);
     setChatBusy(true);
@@ -320,33 +340,15 @@ export default function HomePage() {
         await loadState();
       }
     } catch (e) {
-      setChat(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: `**Erro de rede:** ${e instanceof Error ? e.message : 'Erro'}` }]);
+      setChat(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: `**Erro:** ${e instanceof Error ? e.message : 'Erro'}` }]);
     } finally {
       setChatBusy(false);
     }
   }
 
-  async function clearChat() {
-    await fetch('/api/chat', { method: 'DELETE', credentials: 'same-origin' });
-    await loadState();
-  }
-
-  async function topicAction(payload: Record<string, unknown>) {
-    await fetch('/api/topics', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify(payload),
-    });
-    await loadState();
-  }
-
   async function addError() {
-    if (!errMis.trim() || !errCor.trim()) {
-      setErrFormFeedback('Preencha o erro e a regra correta.');
-      return;
-    }
-    setErrFormFeedback('');
+    if (!errMis.trim() || !errCor.trim()) { setErrMsg('Preencha o erro e a regra correta.'); return; }
+    setErrMsg('');
     await fetch('/api/errors', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -358,12 +360,7 @@ export default function HomePage() {
   }
 
   async function deleteError(id: number) {
-    await fetch('/api/errors', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ id }),
-    });
+    await fetch('/api/errors', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ id }) });
     await loadState();
   }
 
@@ -380,13 +377,6 @@ export default function HomePage() {
     await loadState();
   }
 
-  async function correctEssayWithAgent() {
-    if (!essayText.trim()) return;
-    const p = ESSAY_PROMPTS.find(x => x.id === essayId);
-    setView('chat');
-    await sendMessage(`Corrija esta discursiva (${p?.cargo} — ${p?.title}) pela regra 80/20 do Edital:\n\n${essayText.trim()}`);
-  }
-
   const essayLines = useMemo(() => {
     if (!essayText.trim()) return 0;
     return essayText.split('\n').reduce((acc, l) => acc + Math.max(1, Math.ceil(l.length / 82)), 0);
@@ -396,66 +386,48 @@ export default function HomePage() {
     const t = topics.find(x => x.id === nlmTopicId) || topics[0];
     if (!t) return '';
     const map: Record<string, string> = {
-      podcast: `[Personalizar Audio Overview]\nRevisão direta em português para o concurso CMC 2026 (Selecon). Tema: ${t.subject} — ${t.title}. Foque em prazos, exceções e 3 perguntas V/F no final.`,
-      feynman: `Explique "${t.title}" (${t.subject}) para o concurso CMC 2026 (Selecon) de forma simples, com 5 pegadinhas e resumo rápido.`,
+      podcast: `[Personalizar Audio Overview]\nRevisão objetiva para CMC 2026 (Selecon). Tema: ${t.subject} — ${t.title}. Prazos, exceções e 3 perguntas V/F.`,
+      feynman: `Explique "${t.title}" (${t.subject}) para o concurso CMC 2026 com 5 pegadinhas da Selecon e resumo rápido.`,
       leiseca: `Extraia todos os PRAZOS, QUÓRUNS e artigos exatos sobre "${t.title}" (${t.subject}).`,
       quiz: `Crie 10 questões estilo Selecon sobre "${t.title}" (${t.subject}) com gabarito comentado ao final.`,
     };
     return map[nlmMode] || '';
   }, [topics, nlmTopicId, nlmMode]);
 
-  function downloadFile(name: string, content: string, mime = 'text/markdown') {
-    const blob = new Blob([content], { type: `${mime};charset=utf-8` });
+  function downloadFile(name: string, content: string) {
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = name; a.click();
     URL.revokeObjectURL(url);
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-
   if (!authChecked) {
-    return (
-      <div className="m3-auth-wrap">
-        <div className="m3-auth-card space-y">
-          <div className="skeleton" style={{ height: 24, width: '60%' }} />
-          <div className="skeleton" style={{ height: 42 }} />
-          <div className="skeleton" style={{ height: 42 }} />
-        </div>
-      </div>
-    );
+    return <div className="auth-wrap"><div className="auth-card muted text-sm">Carregando...</div></div>;
   }
 
   if (!authenticated) {
     return (
-      <div className="m3-auth-wrap">
-        <form onSubmit={handleAuthSubmit} className="m3-auth-card space-y">
+      <div className="auth-wrap">
+        <form onSubmit={handleAuthSubmit} className="auth-card space-y">
           <div className="flex-row" style={{ justifyContent: 'space-between' }}>
             <div className="flex-row" style={{ gap: 10 }}>
-              <span className="m3-badge primary" style={{ padding: 8, borderRadius: 10 }}><Icon.Lock /></span>
+              <span className="badge info" style={{ padding: 8, borderRadius: 10 }}><Icon.Lock /></span>
               <div>
-                <h1 style={{ fontSize: 18 }}>{needsSetup ? 'Configuração Inicial' : 'Entrar'}</h1>
-                <div className="text-xs muted">Câmara de Cuiabá 2026</div>
+                <h1 style={{ fontSize: 17 }}>{needsSetup ? 'Criar Acesso' : 'Entrar'}</h1>
+                <div className="text-xs muted">Concurso Câmara de Cuiabá</div>
               </div>
             </div>
-            <button type="button" onClick={toggleTheme} className="m3-icon-btn" aria-label="Alternar tema"><Icon.Theme /></button>
+            <button type="button" onClick={toggleTheme} className="icon-btn" aria-label="Alternar tema"><Icon.Theme /></button>
           </div>
           <p className="text-xs muted" style={{ margin: 0 }}>
-            {needsSetup
-              ? 'Crie seu usuário e senha. Após o cadastro inicial, novos registros ficam bloqueados.'
-              : 'Entre com suas credenciais para acessar seu plano de estudos.'}
+            {needsSetup ? 'Crie seu usuário e senha pessoais (único cadastro permitido).' : 'Entre para acessar seu plano de estudos.'}
           </p>
-          <div>
-            <label htmlFor="auth-user" className="text-xs muted" style={{ display: 'block', marginBottom: 4 }}>Usuário</label>
-            <input id="auth-user" type="text" required autoComplete="username" className="m3-field" value={authUser} onChange={e => setAuthUser(e.target.value)} placeholder="ex: aderaldo" />
-          </div>
-          <div>
-            <label htmlFor="auth-pass" className="text-xs muted" style={{ display: 'block', marginBottom: 4 }}>Senha {needsSetup && '(mín. 8 caracteres)'}</label>
-            <input id="auth-pass" type="password" required minLength={needsSetup ? 8 : 1} autoComplete={needsSetup ? 'new-password' : 'current-password'} className="m3-field" value={authPass} onChange={e => setAuthPass(e.target.value)} placeholder="••••••••" />
-          </div>
+          <input type="text" required autoComplete="username" className="field" value={authUser} onChange={e => setAuthUser(e.target.value)} placeholder="Usuário" />
+          <input type="password" required minLength={needsSetup ? 8 : 1} autoComplete={needsSetup ? 'new-password' : 'current-password'} className="field" value={authPass} onChange={e => setAuthPass(e.target.value)} placeholder="Senha" />
           {authError && <div className="inline-error">{authError}</div>}
-          <button type="submit" disabled={authSubmitting} className="m3-btn m3-btn-filled" style={{ width: '100%' }}>
-            {authSubmitting ? 'Verificando...' : (needsSetup ? 'Criar Conta' : 'Entrar')}
+          <button type="submit" disabled={authSubmitting} className="btn btn-primary" style={{ width: '100%' }}>
+            {authSubmitting ? 'Entrando...' : (needsSetup ? 'Criar Conta' : 'Entrar')}
           </button>
         </form>
       </div>
@@ -463,65 +435,232 @@ export default function HomePage() {
   }
 
   return (
-    <div className="m3-shell">
-      {/* M3 Top App Bar */}
-      <header className="m3-top-bar">
-        <h1 className="m3-top-title">Estudos CMC 2026</h1>
+    <div className="shell">
+      {/* Topbar */}
+      <header className="topbar">
+        <div>
+          <div className="topbar-title">Estudos CMC 2026</div>
+          <div className="topbar-sub">{daysLeft} dias até a prova · {stats.hoursText} estudados</div>
+        </div>
         <div className="flex-row" style={{ gap: 4 }}>
-          <span className="m3-badge primary">{daysLeft}d</span>
-          {username && <span className="m3-badge hide-mobile">{username}</span>}
-          <button onClick={toggleTheme} className="m3-icon-btn" aria-label="Alternar tema"><Icon.Theme /></button>
-          <button onClick={handleLogout} className="m3-icon-btn" aria-label="Sair"><Icon.Logout /></button>
+          <button onClick={toggleTheme} className="icon-btn" aria-label="Alternar tema"><Icon.Theme /></button>
+          <button onClick={handleLogout} className="icon-btn" aria-label="Sair"><Icon.Logout /></button>
         </div>
       </header>
 
-      {/* M3 Navigation Bar (Top on Desktop, Bottom Pill Bar on Mobile) */}
-      <nav className="m3-nav" role="tablist">
-        <button role="tab" aria-selected={view === 'chat'} className={`m3-nav-item ${view === 'chat' ? 'active' : ''}`} onClick={() => setView('chat')}>
-          <span className="m3-nav-pill"><Icon.Chat /></span>
+      {/* Navigation */}
+      <nav className="nav" role="tablist">
+        <button role="tab" aria-selected={view === 'hoje'} className={`nav-btn ${view === 'hoje' ? 'active' : ''}`} onClick={() => setView('hoje')}>
+          <span className="nav-pill"><Icon.Home /></span>
+          <span>Hoje</span>
+        </button>
+        <button role="tab" aria-selected={view === 'materias'} className={`nav-btn ${view === 'materias' ? 'active' : ''}`} onClick={() => setView('materias')}>
+          <span className="nav-pill"><Icon.Book /></span>
+          <span>Matérias</span>
+        </button>
+        <button role="tab" aria-selected={view === 'mentor'} className={`nav-btn ${view === 'mentor' ? 'active' : ''}`} onClick={() => setView('mentor')}>
+          <span className="nav-pill"><Icon.Chat /></span>
           <span>Mentor</span>
         </button>
-        <button role="tab" aria-selected={view === 'hoje'} className={`m3-nav-item ${view === 'hoje' ? 'active' : ''}`} onClick={() => setView('hoje')}>
-          <span className="m3-nav-pill"><Icon.Today /></span>
-          <span>Hoje ({studyQueue.length + reviewQueue.length})</span>
-        </button>
-        <button role="tab" aria-selected={view === 'edital'} className={`m3-nav-item ${view === 'edital' ? 'active' : ''}`} onClick={() => setView('edital')}>
-          <span className="m3-nav-pill"><Icon.List /></span>
-          <span>Edital</span>
-        </button>
-        <button role="tab" aria-selected={view === 'mais'} className={`m3-nav-item ${view === 'mais' ? 'active' : ''}`} onClick={() => setView('mais')}>
-          <span className="m3-nav-pill"><Icon.More /></span>
-          <span>Mais</span>
+        <button role="tab" aria-selected={view === 'caderno'} className={`nav-btn ${view === 'caderno' ? 'active' : ''}`} onClick={() => setView('caderno')}>
+          <span className="nav-pill"><Icon.Note /></span>
+          <span>Caderno</span>
         </button>
       </nav>
 
       {dbError && (
-        <div className="inline-error" style={{ borderRadius: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="inline-error" style={{ margin: '10px 16px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{dbError}</span>
-          <button onClick={loadState} className="m3-btn m3-btn-outlined m3-btn-sm">Recarregar</button>
+          <button onClick={loadState} className="btn btn-outline btn-sm">Recarregar</button>
         </div>
       )}
 
-      <main className="m3-main">
-        {/* VIEW 1: MENTOR */}
-        {view === 'chat' && (
-          <section className="m3-chat-wrap">
-            <div className="m3-chat-bar">
-              <button onClick={() => setView('hoje')} style={{ color: 'var(--md-primary)', fontWeight: 500 }}>
-                Fila: {studyQueue.length} estudar · {reviewQueue.length} revisar
-              </button>
-              <button onClick={clearChat} className="muted" style={{ fontSize: 12 }}>Limpar chat</button>
+      <main className="main">
+        {/* ABA 1: HOJE (TELA INICIAL GUIADA E ÓBVIA) */}
+        {view === 'hoje' && (
+          <section className="scroll-view">
+            {/* Progresso dos 2 Cargos */}
+            <div className="hero">
+              <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: 15 }}>Seu Progresso</span>
+                <span className="badge info">Acertos: {stats.acc}</span>
+              </div>
+              <div className="hero-grid">
+                <div className="prog-box">
+                  <div className="flex-row" style={{ justifyContent: 'space-between', fontSize: 12 }}>
+                    <span className="muted">Analista TI</span>
+                    <strong>{stats.anlPct}%</strong>
+                  </div>
+                  <div className="prog-track"><div className="prog-bar" style={{ width: `${stats.anlPct}%` }} /></div>
+                </div>
+                <div className="prog-box">
+                  <div className="flex-row" style={{ justifyContent: 'space-between', fontSize: 12 }}>
+                    <span className="muted">Técnico Leg.</span>
+                    <strong>{stats.tecPct}%</strong>
+                  </div>
+                  <div className="prog-track"><div className="prog-bar" style={{ width: `${stats.tecPct}%` }} /></div>
+                </div>
+              </div>
             </div>
 
-            <div className="m3-chat-list">
-              {loading ? (
-                <div className="space-y">
-                  <div className="skeleton" style={{ height: 52, width: '75%' }} />
-                  <div className="skeleton" style={{ height: 40, width: '50%', marginLeft: 'auto' }} />
+            {/* Revisões Vencidas Hoje */}
+            {dueReviews.length > 0 && (
+              <div className="card">
+                <div className="card-head">
+                  <span>1. Revisar Hoje ({dueReviews.length})</span>
+                  <span className="badge warn">Prioridade</span>
                 </div>
-              ) : chat.length === 0 ? (
-                <div className="m3-bubble assistant">
-                  <p><strong>Pronto para estudar.</strong> Pergunte o que estudar hoje, peça um quiz ou relate o que já concluiu.</p>
+                {dueReviews.map(t => (
+                  <div key={t.id} className="task-item">
+                    <div>
+                      <div className="text-xs muted">{t.subject} · Ciclo {t.review_interval || 1}d</div>
+                      <div style={{ fontWeight: 600, marginTop: 2 }}>{t.title}</div>
+                    </div>
+                    <div className="task-actions">
+                      <button onClick={() => openStudySheet(t)} className="btn btn-outline btn-sm">Ver Notas</button>
+                      <button onClick={() => topicAction({ action: 'complete_review', id: t.id })} className="btn btn-primary btn-sm">Marcar Revisado</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Estudar Hoje */}
+            <div className="card">
+              <div className="card-head">
+                <span>{dueReviews.length > 0 ? '2. ' : ''}Estudar Hoje ({studyQueue.length})</span>
+                <button onClick={() => setView('materias')} className="btn btn-tonal btn-sm">+ Escolher Matéria</button>
+              </div>
+              {loading ? (
+                <div className="card-pad muted text-sm">Carregando seu plano...</div>
+              ) : studyQueue.length === 0 ? (
+                <div className="card-pad space-y">
+                  <p className="text-sm muted" style={{ margin: 0 }}>
+                    Você ainda não definiu o que estudar hoje. Clique abaixo para o Mentor escolher os tópicos de maior peso nos dois cargos:
+                  </p>
+                  <button
+                    onClick={() => sendMessage('O que vamos estudar hoje? Monte minha fila com 2 ou 3 tópicos prioritários.', true)}
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                  >
+                    Montar meu plano de hoje com o Mentor
+                  </button>
+                </div>
+              ) : (
+                studyQueue.map(t => (
+                  <div key={t.id} className="task-item">
+                    <div>
+                      <div className="flex-row" style={{ gap: 6, marginBottom: 3 }}>
+                        <span className="text-xs muted">{t.subject}</span>
+                        <span className="badge info">{t.overlap === 'ambos-identico' ? '2 Cargos' : t.overlap === 'ponte-peso' ? 'Ponte' : t.overlap === 'exclusivo-analista' ? 'Analista TI' : 'Técnico'}</span>
+                      </div>
+                      <div style={{ fontWeight: 600 }}>{t.title}</div>
+                    </div>
+                    <div className="task-actions">
+                      <button onClick={() => topicAction({ action: 'toggle_study', id: t.id })} className="btn btn-outline btn-sm">Tirar</button>
+                      <button onClick={() => openStudySheet(t)} className="btn btn-primary btn-sm"><Icon.Play /> Estudar</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Próximas Revisões */}
+            {futureReviews.length > 0 && (
+              <div className="card">
+                <div className="card-head">
+                  <span>Próximas Revisões Agendadas</span>
+                  <span className="text-xs muted">{futureReviews.length}</span>
+                </div>
+                {futureReviews.slice(0, 5).map(t => (
+                  <div key={t.id} className="task-item" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="text-xs muted">{t.subject}</div>
+                      <div className="text-sm" style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</div>
+                    </div>
+                    <span className="badge">{fmtBR(t.next_review_date)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ABA 2: MATÉRIAS (AGRUPADO EM 10 DISCIPLINAS EXPANSÍVEIS) */}
+        {view === 'materias' && (
+          <section className="scroll-view">
+            <input
+              className="field"
+              type="text"
+              value={subjectSearch}
+              onChange={e => setSubjectSearch(e.target.value)}
+              placeholder="Buscar assunto no edital (ex: SQL, quórum, atos)..."
+            />
+
+            {SUBJECT_META.map(sm => {
+              const subTopics = topics.filter(t =>
+                t.subject === sm.name &&
+                (!subjectSearch.trim() || `${t.title} ${t.subject}`.toLowerCase().includes(subjectSearch.toLowerCase()))
+              );
+              if (subjectSearch.trim() && subTopics.length === 0) return null;
+
+              const doneCount = subTopics.filter(t => t.status === 'revisar' || t.status === 'dominado').length;
+              const isOpen = Boolean(subjectSearch.trim()) || openSubject === sm.name;
+
+              return (
+                <div key={sm.name} className="card">
+                  <button className="subject-header" onClick={() => setOpenSubject(isOpen ? null : sm.name)}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14.5 }}>{sm.name}</div>
+                      <div className="text-xs muted" style={{ marginTop: 2 }}>
+                        Analista: {sm.wAnl} · Técnico: {sm.wTec} · <strong>{doneCount}/{subTopics.length}</strong>
+                      </div>
+                    </div>
+                    <Icon.Chevron open={isOpen} />
+                  </button>
+
+                  {isOpen && (
+                    <div style={{ borderTop: '1px solid var(--md-outline-soft)' }}>
+                      {subTopics.map(t => (
+                        <div key={t.id} className="task-item">
+                          <div>
+                            <div className="text-sm" style={{ fontWeight: 500 }}>{t.title}</div>
+                            <div className="text-xs muted" style={{ marginTop: 3 }}>
+                              Domínio {t.mastery}/5 {t.q_total > 0 ? `· ${t.q_right}/${t.q_total} acertos` : ''} {t.review_queue ? `· Rev. ${fmtBR(t.next_review_date)}` : ''}
+                            </div>
+                          </div>
+                          <div className="task-actions">
+                            <button
+                              onClick={() => topicAction({ action: 'toggle_study', id: t.id })}
+                              className={`btn btn-sm ${t.study_queue ? 'btn-tonal' : 'btn-outline'}`}
+                            >
+                              {t.study_queue ? 'Na fila de Hoje' : '+ Hoje'}
+                            </button>
+                            <button onClick={() => openStudySheet(t)} className="btn btn-primary btn-sm">Estudar</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+        )}
+
+        {/* ABA 3: MENTOR (CHAT LIMPO E CONCISO) */}
+        {view === 'mentor' && (
+          <section className="chat-wrap">
+            <div style={{ padding: '10px 16px', background: 'var(--md-surface)', borderBottom: '1px solid var(--md-outline-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="text-xs muted">Diga o que estudou, acertos ou peça um quiz</span>
+              <button onClick={async () => { await fetch('/api/chat', { method: 'DELETE', credentials: 'same-origin' }); await loadState(); }} className="text-xs muted" style={{ fontWeight: 600 }}>Limpar</button>
+            </div>
+
+            <div className="chat-list">
+              {chat.length === 0 ? (
+                <div className="bubble bot">
+                  <p><strong>Como posso ajudar agora?</strong></p>
+                  <p>Exemplos: &ldquo;O que estudamos hoje?&rdquo;, &ldquo;Fiz 17 de 20 em Atos Administrativos&rdquo; ou &ldquo;Me dê 3 questões de Regimento Interno&rdquo;.</p>
                 </div>
               ) : (
                 chat.map(m => {
@@ -529,418 +668,233 @@ export default function HomePage() {
                     let items: string[] = [];
                     try { items = JSON.parse(m.content); } catch {}
                     return (
-                      <div key={m.id} className="m3-trace-row">
-                        {items.map((it, idx) => <span key={idx} className="m3-badge success"><Icon.Check /> {it}</span>)}
+                      <div key={m.id} className="flex-row" style={{ gap: 6 }}>
+                        {items.map((it, idx) => <span key={idx} className="badge ok">✓ {it}</span>)}
                       </div>
                     );
                   }
                   return (
-                    <div key={m.id} className={`m3-bubble ${m.role === 'user' ? 'user' : 'assistant'}`}>
+                    <div key={m.id} className={`bubble ${m.role === 'user' ? 'user' : 'bot'}`}>
                       {m.role === 'user' ? m.content : renderFormattedText(m.content)}
                     </div>
                   );
                 })
               )}
-              {chatBusy && <div className="m3-bubble assistant muted">Atualizando...</div>}
+              {chatBusy && <div className="bubble bot muted">Respondendo...</div>}
               <div ref={chatEndRef} />
             </div>
 
-            <div className="m3-suggestions">
-              <button className="m3-chip" onClick={() => sendMessage('O que vamos estudar hoje?')}>O que estudar hoje?</button>
-              <button className="m3-chip" onClick={() => sendMessage('Tenho 1h agora, monte um bloco.')}>Tenho 1h</button>
-              <button className="m3-chip" onClick={() => sendMessage('Quiz de 3 questões Selecon do tema atual.')}>Quiz 3q</button>
-              <button className="m3-chip" onClick={() => sendMessage('Quais meus pontos fracos?')}>Pontos fracos</button>
+            <div style={{ padding: '8px 12px', display: 'flex', gap: 6, overflowX: 'auto', background: 'var(--md-bg)' }}>
+              <button className="btn btn-outline btn-sm" onClick={() => sendMessage('O que vamos estudar hoje?')}>Plano de hoje</button>
+              <button className="btn btn-outline btn-sm" onClick={() => sendMessage('Quiz de 3 questões Selecon do tema atual.')}>Quiz 3q</button>
+              <button className="btn btn-outline btn-sm" onClick={() => sendMessage('Quais meus pontos fracos?')}>Pontos fracos</button>
             </div>
 
-            <div className="m3-composer">
+            <div className="composer">
               <textarea
                 rows={1}
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                  }
-                }}
-                placeholder="Mensagem para o mentor..."
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                placeholder="Digite aqui..."
               />
-              <button disabled={chatBusy} onClick={() => sendMessage()} className="m3-btn m3-btn-filled" style={{ width: 44, height: 44, padding: 0 }} aria-label="Enviar mensagem">
+              <button disabled={chatBusy} onClick={() => sendMessage()} className="btn btn-primary" style={{ width: 44, height: 44, padding: 0 }} aria-label="Enviar">
                 <Icon.Send />
               </button>
             </div>
           </section>
         )}
 
-        {/* VIEW 2: HOJE */}
-        {view === 'hoje' && (
-          <section className="m3-view space-y">
-            <div className="m3-metrics">
-              <div className="m3-metric-card">
-                <div className="text-xs muted">Analista TI</div>
-                <div style={{ fontSize: 22, fontWeight: 500 }}>{stats.anlPct}%</div>
-              </div>
-              <div className="m3-metric-card">
-                <div className="text-xs muted">Técnico Leg.</div>
-                <div style={{ fontSize: 22, fontWeight: 500 }}>{stats.tecPct}%</div>
-              </div>
-              <div className="m3-metric-card">
-                <div className="text-xs muted">Acertos</div>
-                <div style={{ fontSize: 22, fontWeight: 500 }}>{stats.acc}</div>
-              </div>
+        {/* ABA 4: CADERNO (ERROS, DISCURSIVA, NOTEBOOKLM) */}
+        {view === 'caderno' && (
+          <section className="scroll-view">
+            <div className="segmented">
+              <button className={`seg-btn ${cadernoTab === 'erros' ? 'active' : ''}`} onClick={() => setCadernoTab('erros')}>Erros ({errors.length})</button>
+              <button className={`seg-btn ${cadernoTab === 'discursiva' ? 'active' : ''}`} onClick={() => setCadernoTab('discursiva')}>Discursiva</button>
+              <button className={`seg-btn ${cadernoTab === 'notebooklm' ? 'active' : ''}`} onClick={() => setCadernoTab('notebooklm')}>NotebookLM</button>
             </div>
 
-            <div className="two-col">
-              <div className="m3-card-outlined">
-                <div className="m3-card-head">
-                  <span>Para Estudar ({studyQueue.length})</span>
-                  <button onClick={() => setView('edital')} className="m3-btn m3-btn-tonal m3-btn-sm">+ Setar</button>
-                </div>
-                {studyQueue.length === 0 ? (
-                  <div className="m3-card-body text-xs muted">Fila vazia. Pergunte ao Mentor ou clique em + Setar.</div>
-                ) : studyQueue.map(t => (
-                  <div key={t.id} className="m3-list-item">
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div className="text-xs muted">{t.subject}</div>
-                      <div className="text-sm" style={{ fontWeight: 500 }}>{t.title}</div>
-                    </div>
-                    <button onClick={() => topicAction({ action: 'complete_study', id: t.id })} className="m3-btn m3-btn-filled m3-btn-sm">Concluir</button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="m3-card-outlined">
-                <div className="m3-card-head">
-                  <span>Revisões 1→3→7→15d ({reviewQueue.length})</span>
-                </div>
-                {reviewQueue.length === 0 ? (
-                  <div className="m3-card-body text-xs muted">Sem revisões agendadas ainda.</div>
-                ) : reviewQueue.map(t => {
-                  const due = !t.next_review_date || t.next_review_date <= today;
-                  return (
-                    <div key={t.id} className="m3-list-item">
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div className="text-xs" style={{ color: due ? 'var(--md-warn)' : 'var(--md-on-surface-variant)' }}>
-                          {due ? 'Revisar hoje' : fmtBR(t.next_review_date)} · Ciclo {t.review_interval || 1}d
-                        </div>
-                        <div className="text-sm" style={{ fontWeight: 500 }}>{t.title}</div>
-                      </div>
-                      <button onClick={() => topicAction({ action: 'complete_review', id: t.id })} className="m3-btn m3-btn-tonal m3-btn-sm">Revisado</button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="m3-card">
-              <div className="m3-card-head">
-                <span>Timer de Foco ({stats.hoursText})</span>
-                <div className="flex-row" style={{ gap: 6 }}>
-                  <button onClick={() => { setTimerRunning(false); setTimerInitial(50 * 60); setTimerSeconds(50 * 60); }} className="m3-chip">50m</button>
-                  <button onClick={() => { setTimerRunning(false); setTimerInitial(25 * 60); setTimerSeconds(25 * 60); }} className="m3-chip">25m</button>
-                  <button onClick={() => { setTimerRunning(false); setTimerInitial(15 * 60); setTimerSeconds(15 * 60); }} className="m3-chip">15m</button>
-                </div>
-              </div>
-              <div className="m3-card-body space-y">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="mono" style={{ fontSize: 30, fontWeight: 500 }}>
-                    {String(Math.floor(timerSeconds / 60)).padStart(2, '0')}:{String(timerSeconds % 60).padStart(2, '0')}
-                  </span>
-                  <div className="flex-row">
-                    <button onClick={() => setTimerRunning(r => !r)} className="m3-btn m3-btn-filled m3-btn-sm">{timerRunning ? 'Pausar' : 'Iniciar'}</button>
-                    <button
-                      onClick={() => {
-                        const min = Math.max(1, Math.round((timerInitial - timerSeconds) / 60) || Math.round(timerInitial / 60));
-                        if (timerTopicId) topicAction({ action: 'log_timer', id: timerTopicId, minutes: min });
-                        setTimerRunning(false);
-                        setTimerSeconds(timerInitial);
-                      }}
-                      className="m3-btn m3-btn-outlined m3-btn-sm"
-                    >
-                      Salvar
-                    </button>
-                  </div>
-                </div>
-                <select aria-label="Tópico do timer" className="m3-field" value={timerTopicId} onChange={e => setTimerTopicId(e.target.value)}>
-                  {topics.map(t => <option key={t.id} value={t.id}>[{t.subject}] {t.title.slice(0, 50)}</option>)}
-                </select>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* VIEW 3: EDITAL */}
-        {view === 'edital' && (
-          <section className="m3-view space-y">
-            <div className="two-col" style={{ gap: 8 }}>
-              <input className="m3-field" type="text" value={fSearch} onChange={e => setFSearch(e.target.value)} placeholder="Buscar tópico, lei..." />
-              <div className="two-col" style={{ gap: 8 }}>
-                <select aria-label="Cruzamento" className="m3-field" value={fOverlap} onChange={e => setFOverlap(e.target.value)}>
-                  <option value="all">Todos</option>
-                  <option value="ambos-identico">100% Comum</option>
-                  <option value="ponte-peso">Ponte</option>
-                  <option value="exclusivo-analista">Analista TI</option>
-                  <option value="exclusivo-tecnico">Técnico</option>
-                </select>
-                <select aria-label="Disciplina" className="m3-field" value={fSubject} onChange={e => setFSubject(e.target.value)}>
-                  <option value="all">Disciplina</option>
-                  {SUBJECT_META.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex-row" style={{ justifyContent: 'space-between' }}>
-              <span className="text-xs muted">{filteredTopics.length} tópicos</span>
-              <button onClick={() => setShowCustomModal(true)} className="m3-btn m3-btn-tonal m3-btn-sm">+ Novo Tópico</button>
-            </div>
-
-            <div className="m3-card-outlined">
-              {filteredTopics.map(t => {
-                const badgeCls = t.overlap === 'ambos-identico' ? 'success' : t.overlap === 'ponte-peso' ? 'warn' : t.overlap === 'exclusivo-analista' ? 'primary' : 'error';
-                const badgeTxt = t.overlap === 'ambos-identico' ? 'Comum' : t.overlap === 'ponte-peso' ? 'Ponte' : t.overlap === 'exclusivo-analista' ? 'Analista TI' : 'Técnico';
-                return (
-                  <div key={t.id} className="m3-list-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
-                    <div>
-                      <div className="flex-row" style={{ gap: 6, marginBottom: 4 }}>
-                        <strong className="text-xs">{t.subject}</strong>
-                        <span className={`m3-badge ${badgeCls}`}>{badgeTxt}</span>
-                        <span className="text-xs muted">Nível {t.mastery}/5 {t.q_total ? `· ${t.q_right}/${t.q_total}q` : ''}</span>
-                      </div>
-                      <div className="text-sm" style={{ fontWeight: 500 }}>{t.title}</div>
-                    </div>
-                    <div className="flex-row" style={{ justifyContent: 'flex-end' }}>
-                      <button onClick={() => topicAction({ action: 'toggle_study', id: t.id })} className={`m3-btn m3-btn-sm ${t.study_queue ? 'm3-btn-filled' : 'm3-btn-outlined'}`}>
-                        {t.study_queue ? 'Na fila' : '+ Estudar'}
-                      </button>
-                      <button onClick={() => topicAction({ action: 'toggle_review', id: t.id })} className="m3-btn m3-btn-tonal m3-btn-sm">
-                        {t.review_queue ? `Rev ${fmtBR(t.next_review_date)}` : '+ Revisar'}
-                      </button>
-                      <button onClick={() => setEditTopic({ ...t })} className="m3-btn m3-btn-outlined m3-btn-sm">Editar</button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* VIEW 4: MAIS */}
-        {view === 'mais' && (
-          <section className="m3-view space-y">
-            <div className="flex-row" style={{ gap: 8 }}>
-              <button onClick={() => setMaisTab('erros')} className={`m3-btn m3-btn-sm ${maisTab === 'erros' ? 'm3-btn-filled' : 'm3-btn-tonal'}`}>Erros ({errors.length})</button>
-              <button onClick={() => setMaisTab('discursiva')} className={`m3-btn m3-btn-sm ${maisTab === 'discursiva' ? 'm3-btn-filled' : 'm3-btn-tonal'}`}>Discursiva</button>
-              <button onClick={() => setMaisTab('notebooklm')} className={`m3-btn m3-btn-sm ${maisTab === 'notebooklm' ? 'm3-btn-filled' : 'm3-btn-tonal'}`}>NotebookLM</button>
-            </div>
-
-            {maisTab === 'erros' && (
-              <div className="m3-card-outlined">
-                <div className="m3-card-head">
-                  <span>Caderno de Erros</span>
+            {cadernoTab === 'erros' && (
+              <div className="card">
+                <div className="card-head">
+                  <span>Registrar Erro</span>
                   <button
                     onClick={() => {
                       let md = `# Erros CMC 2026 (${today})\n\n`;
                       errors.forEach(e => { md += `- **${e.subject} (${e.topic}):** ${e.mistake} → ${e.correction}\n`; });
                       downloadFile(`erros_cmc_${today}.md`, md);
                     }}
-                    className="m3-btn m3-btn-outlined m3-btn-sm"
+                    className="btn btn-outline btn-sm"
                   >
-                    Exportar .MD
+                    Baixar .MD
                   </button>
                 </div>
-                <div className="m3-card-body space-y">
-                  <select aria-label="Disciplina" className="m3-field" value={errSub} onChange={e => setErrSub(e.target.value)}>
+                <div className="card-pad space-y">
+                  <select aria-label="Disciplina" className="field" value={errSub} onChange={e => setErrSub(e.target.value)}>
                     {SUBJECT_META.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                   </select>
-                  <input className="m3-field" type="text" value={errTop} onChange={e => setErrTop(e.target.value)} placeholder="Assunto / Artigo" />
-                  <input className="m3-field" type="text" value={errMis} onChange={e => setErrMis(e.target.value)} placeholder="O que você errou..." />
-                  <input className="m3-field" type="text" value={errCor} onChange={e => setErrCor(e.target.value)} placeholder="Regra correta..." />
-                  {errFormFeedback && <div className="inline-error">{errFormFeedback}</div>}
-                  <button onClick={addError} className="m3-btn m3-btn-filled" style={{ width: '100%' }}>Registrar Erro</button>
+                  <input className="field" type="text" value={errTop} onChange={e => setErrTop(e.target.value)} placeholder="Assunto / Artigo" />
+                  <input className="field" type="text" value={errMis} onChange={e => setErrMis(e.target.value)} placeholder="O que você errou..." />
+                  <input className="field" type="text" value={errCor} onChange={e => setErrCor(e.target.value)} placeholder="Regra correta..." />
+                  {errMsg && <div className="inline-error">{errMsg}</div>}
+                  <button onClick={addError} className="btn btn-primary" style={{ width: '100%' }}>Salvar Erro</button>
 
                   {errors.map(e => (
-                    <div key={e.id} style={{ padding: '10px 0', borderTop: '1px solid var(--md-outline-variant)' }}>
+                    <div key={e.id} style={{ paddingTop: 10, borderTop: '1px solid var(--md-outline-soft)' }}>
                       <div className="flex-row" style={{ justifyContent: 'space-between' }}>
-                        <strong className="text-xs">{e.subject} — {e.topic}</strong>
-                        <button onClick={() => deleteError(e.id)} className="text-xs muted">Remover</button>
+                        <strong className="text-xs">{e.subject} · {e.topic}</strong>
+                        <button onClick={() => deleteError(e.id)} className="text-xs muted">Apagar</button>
                       </div>
                       <div className="text-xs" style={{ color: 'var(--md-error)', marginTop: 3 }}>Erro: {e.mistake}</div>
-                      <div className="text-xs" style={{ color: 'var(--md-success)', marginTop: 2 }}>Regra: {e.correction}</div>
+                      <div className="text-xs" style={{ color: 'var(--md-success)', marginTop: 2 }}>Correto: {e.correction}</div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {maisTab === 'discursiva' && (
-              <div className="m3-card-outlined">
-                <div className="m3-card-head">
-                  <span>Discursiva (20–30 linhas)</span>
-                  <span className={`m3-badge ${essayLines >= 20 && essayLines <= 30 ? 'success' : ''}`}>{essayLines} / 30 linhas</span>
+            {cadernoTab === 'discursiva' && (
+              <div className="card">
+                <div className="card-head">
+                  <span>Prática Discursiva</span>
+                  <span className={`badge ${essayLines >= 20 && essayLines <= 30 ? 'ok' : ''}`}>{essayLines} / 30 linhas</span>
                 </div>
-                <div className="m3-card-body space-y">
-                  <select aria-label="Tema" className="m3-field" value={essayId} onChange={e => setEssayId(e.target.value)}>
+                <div className="card-pad space-y">
+                  <select aria-label="Tema" className="field" value={essayId} onChange={e => setEssayId(e.target.value)}>
                     {ESSAY_PROMPTS.map(p => <option key={p.id} value={p.id}>[{p.cargo}] {p.title}</option>)}
                   </select>
-                  <div className="text-xs muted" style={{ padding: 12, background: 'var(--md-surface-container-low)', borderRadius: 8 }}>
+                  <div className="text-xs muted" style={{ padding: 10, background: 'var(--md-surface-alt)', borderRadius: 10 }}>
                     {ESSAY_PROMPTS.find(x => x.id === essayId)?.desc}
                   </div>
-                  <textarea className="m3-field" rows={10} value={essayText} onChange={e => setEssayText(e.target.value)} placeholder="Escreva sua resposta..." />
+                  <textarea className="field" rows={9} value={essayText} onChange={e => setEssayText(e.target.value)} placeholder="Escreva sua resposta (20 a 30 linhas)..." />
                   <div className="flex-row">
-                    <button onClick={correctEssayWithAgent} className="m3-btn m3-btn-filled" style={{ flex: 1 }}>Corrigir com Mentor</button>
-                    <button onClick={saveEssay} className="m3-btn m3-btn-tonal">Salvar</button>
+                    <button
+                      onClick={() => {
+                        if (!essayText.trim()) return;
+                        const p = ESSAY_PROMPTS.find(x => x.id === essayId);
+                        sendMessage(`Corrija esta discursiva (${p?.cargo} — ${p?.title}) pela regra 80/20:\n\n${essayText.trim()}`, true);
+                      }}
+                      className="btn btn-primary"
+                      style={{ flex: 1 }}
+                    >
+                      Corrigir com Mentor
+                    </button>
+                    <button onClick={saveEssay} className="btn btn-outline">Salvar</button>
                   </div>
                   {essays.map(e => (
-                    <div key={e.id} className="m3-list-item" style={{ padding: '8px 0' }}>
-                      <span className="text-xs">[{e.cargo}] {e.title}</span>
-                      <span className="text-xs muted">{fmtBR(e.date)}</span>
+                    <div key={e.id} className="text-xs muted" style={{ paddingTop: 8, borderTop: '1px solid var(--md-outline-soft)' }}>
+                      {fmtBR(e.date)} · [{e.cargo}] {e.title}
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {maisTab === 'notebooklm' && (
+            {cadernoTab === 'notebooklm' && (
               <div className="space-y">
-                <div className="m3-card-outlined">
-                  <div className="m3-card-head"><span>NotebookLM &amp; Drive</span></div>
-                  <div className="m3-card-body space-y">
-                    <a href="https://drive.google.com/drive/folders/1RU85Ck3qASnCMvCL6TgH_V6_OmwoPNTR" target="_blank" rel="noopener" className="m3-btn m3-btn-filled" style={{ width: '100%', textDecoration: 'none' }}>
-                      Abrir Pasta no Google Drive
-                    </a>
-                    <button
-                      onClick={() => {
-                        let md = `# Progresso & Erros CMC 2026 (${today})\n\n`;
-                        topics.filter(t => t.mastery <= 2 || t.study_queue || t.review_queue).forEach(t => {
-                          md += `- [${t.subject}] ${t.title} (Nível ${t.mastery}/5)\n`;
-                        });
-                        md += '\n## Erros\n';
-                        errors.forEach(e => { md += `- ${e.subject}: ${e.mistake} -> ${e.correction}\n`; });
-                        downloadFile(`progresso_notebooklm_${today}.md`, md);
-                      }}
-                      className="m3-btn m3-btn-tonal"
-                      style={{ width: '100%' }}
-                    >
-                      Baixar Progresso (.md) p/ NotebookLM
-                    </button>
-                    <select aria-label="Tópico" className="m3-field" value={nlmTopicId} onChange={e => setNlmTopicId(e.target.value)}>
-                      {topics.map(t => <option key={t.id} value={t.id}>[{t.subject}] {t.title.slice(0, 50)}</option>)}
-                    </select>
-                    <select aria-label="Modo" className="m3-field" value={nlmMode} onChange={e => setNlmMode(e.target.value)}>
-                      <option value="podcast">Audio Overview (Podcast)</option>
-                      <option value="feynman">Explicação Feynman</option>
-                      <option value="leiseca">Prazos &amp; Quóruns</option>
-                      <option value="quiz">Simulado 10 Questões</option>
-                    </select>
-                    <textarea className="m3-field mono" rows={4} readOnly value={nlmPromptText} />
-                    <div className="flex-row">
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(nlmPromptText);
-                          setNlmCopied('Copiado.');
-                          setTimeout(() => setNlmCopied(''), 2000);
-                        }}
-                        className="m3-btn m3-btn-outlined m3-btn-sm"
-                      >
-                        Copiar Prompt
-                      </button>
-                      {nlmCopied && <span className="text-xs" style={{ color: 'var(--md-success)' }}>{nlmCopied}</span>}
-                    </div>
-                  </div>
+                <div className="card card-pad space-y">
+                  <div style={{ fontWeight: 600 }}>Integração com NotebookLM</div>
+                  <p className="text-xs muted" style={{ margin: 0 }}>Acesse suas 3 pastas sem duplicatas no Google Drive ou gere prompts prontos abaixo:</p>
+                  <a href="https://drive.google.com/drive/folders/1RU85Ck3qASnCMvCL6TgH_V6_OmwoPNTR" target="_blank" rel="noopener" className="btn btn-primary" style={{ width: '100%', textDecoration: 'none' }}>
+                    Abrir Pasta no Google Drive
+                  </a>
+                  <button
+                    onClick={() => {
+                      let md = `# Progresso & Erros CMC 2026 (${today})\n\n`;
+                      topics.filter(t => t.mastery <= 2 || t.study_queue || t.review_queue).forEach(t => {
+                        md += `- [${t.subject}] ${t.title} (Nível ${t.mastery}/5)\n`;
+                      });
+                      md += '\n## Erros\n';
+                      errors.forEach(e => { md += `- ${e.subject}: ${e.mistake} -> ${e.correction}\n`; });
+                      downloadFile(`progresso_notebooklm_${today}.md`, md);
+                    }}
+                    className="btn btn-tonal"
+                    style={{ width: '100%' }}
+                  >
+                    Baixar Meu Progresso (.md)
+                  </button>
+                  <select aria-label="Tópico" className="field" value={nlmTopicId} onChange={e => setNlmTopicId(e.target.value)}>
+                    {topics.map(t => <option key={t.id} value={t.id}>[{t.subject}] {t.title.slice(0, 48)}</option>)}
+                  </select>
+                  <select aria-label="Modo" className="field" value={nlmMode} onChange={e => setNlmMode(e.target.value)}>
+                    <option value="podcast">Audio Overview (Podcast)</option>
+                    <option value="feynman">Explicação Feynman</option>
+                    <option value="leiseca">Prazos &amp; Quóruns</option>
+                    <option value="quiz">Simulado 10 Questões</option>
+                  </select>
+                  <textarea className="field mono" rows={4} readOnly value={nlmPromptText} />
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(nlmPromptText); setNlmCopied('Copiado.'); setTimeout(() => setNlmCopied(''), 2000); }}
+                    className="btn btn-outline btn-sm"
+                  >
+                    Copiar Prompt
+                  </button>
+                  {nlmCopied && <span className="text-xs" style={{ color: 'var(--md-success)', marginLeft: 8 }}>{nlmCopied}</span>}
                 </div>
 
-                <div className="m3-card-outlined">
-                  <div className="m3-card-head"><span>Últimas Sessões</span></div>
-                  {logs.length === 0 ? (
-                    <div className="m3-card-body text-xs muted">Nenhuma sessão registrada ainda.</div>
-                  ) : logs.slice(0, 12).map(l => (
-                    <div key={l.id} className="m3-list-item">
-                      <span className="text-xs"><strong>{l.subject}</strong> · {l.title.slice(0, 32)}</span>
-                      <span className="text-xs muted">{fmtBR(l.date)} · {l.minutes}m</span>
-                    </div>
-                  ))}
-                </div>
+                {logs.length > 0 && (
+                  <div className="card">
+                    <div className="card-head"><span>Histórico Recente</span></div>
+                    {logs.slice(0, 8).map(l => (
+                      <div key={l.id} className="task-item" style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <span className="text-xs"><strong>{l.subject}</strong> · {l.title.slice(0, 28)}</span>
+                        <span className="text-xs muted">{fmtBR(l.date)} · {l.minutes}m</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </section>
         )}
       </main>
 
-      {/* M3 DIALOG: EDITAR TÓPICO */}
-      {editTopic && (
-        <div className="m3-scrim">
-          <div className="m3-dialog">
-            <div className="m3-dialog-head">
+      {/* BOTTOM SHEET DE ESTUDO (TIMER + QUESTÕES + CONCLUIR) */}
+      {activeTopic && (
+        <div className="scrim" onClick={e => { if (e.target === e.currentTarget) { setSheetRunning(false); setActiveTopic(null); } }}>
+          <div className="sheet">
+            <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div className="text-xs muted">{editTopic.subject}</div>
-                <div className="text-sm">{editTopic.title}</div>
+                <div className="text-xs muted">{activeTopic.subject}</div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{activeTopic.title}</div>
               </div>
-              <button onClick={() => setEditTopic(null)} className="m3-icon-btn" aria-label="Fechar">✕</button>
+              <button onClick={() => { setSheetRunning(false); setActiveTopic(null); }} className="icon-btn" aria-label="Fechar">✕</button>
             </div>
-            <div className="m3-dialog-body">
-              <div className="two-col" style={{ gap: 10 }}>
-                <label className="flex-row text-xs"><input type="checkbox" checked={editTopic.study_queue} onChange={e => setEditTopic({ ...editTopic, study_queue: e.target.checked })} /> Fila Estudar</label>
-                <label className="flex-row text-xs"><input type="checkbox" checked={editTopic.review_queue} onChange={e => setEditTopic({ ...editTopic, review_queue: e.target.checked })} /> Fila Revisar</label>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                <div>
-                  <label className="text-xs muted">Domínio</label>
-                  <select className="m3-field" value={editTopic.mastery} onChange={e => setEditTopic({ ...editTopic, mastery: Number(e.target.value) })}>
-                    <option value={1}>1/5</option><option value={2}>2/5</option><option value={3}>3/5</option><option value={4}>4/5</option><option value={5}>5/5</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs muted">Acertos</label>
-                  <input type="number" min={0} className="m3-field" value={editTopic.q_right} onChange={e => setEditTopic({ ...editTopic, q_right: Number(e.target.value) })} />
-                </div>
-                <div>
-                  <label className="text-xs muted">Total</label>
-                  <input type="number" min={0} className="m3-field" value={editTopic.q_total} onChange={e => setEditTopic({ ...editTopic, q_total: Number(e.target.value) })} />
-                </div>
-              </div>
-              <textarea rows={3} className="m3-field" value={editTopic.notes} onChange={e => setEditTopic({ ...editTopic, notes: e.target.value })} placeholder="Anotações..." />
-            </div>
-            <div className="m3-dialog-actions">
-              <button onClick={() => setEditTopic(null)} className="m3-btn m3-btn-outlined m3-btn-sm">Cancelar</button>
-              <button onClick={async () => { await topicAction({ action: 'update', ...editTopic }); setEditTopic(null); }} className="m3-btn m3-btn-filled m3-btn-sm">Salvar</button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* M3 DIALOG: NOVO TÓPICO */}
-      {showCustomModal && (
-        <div className="m3-scrim">
-          <div className="m3-dialog" style={{ maxWidth: 420 }}>
-            <div className="m3-dialog-head">
-              <span>Novo Tópico</span>
-              <button onClick={() => setShowCustomModal(false)} className="m3-icon-btn" aria-label="Fechar">✕</button>
+            {/* Timer Bloco */}
+            <div style={{ background: 'var(--md-surface-alt)', borderRadius: 14, padding: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span className="mono" style={{ fontSize: 28, fontWeight: 700 }}>
+                {String(Math.floor(sheetSeconds / 60)).padStart(2, '0')}:{String(sheetSeconds % 60).padStart(2, '0')}
+              </span>
+              <div className="flex-row">
+                <button onClick={() => setSheetRunning(r => !r)} className="btn btn-tonal btn-sm">{sheetRunning ? 'Pausar' : 'Iniciar'}</button>
+                <button onClick={() => { setSheetRunning(false); setSheetSeconds(40 * 60); }} className="btn btn-outline btn-sm">40m</button>
+              </div>
             </div>
-            <div className="m3-dialog-body">
-              <select aria-label="Disciplina" className="m3-field" value={ncSubject} onChange={e => setNcSubject(e.target.value)}>
-                {SUBJECT_META.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
-              </select>
-              <input className="m3-field" type="text" value={ncTitle} onChange={e => setNcTitle(e.target.value)} placeholder="Título do conteúdo..." />
-              <select aria-label="Cargo" className="m3-field" value={ncOverlap} onChange={e => setNcOverlap(e.target.value)}>
-                <option value="ambos-identico">Comum aos 2 Cargos</option>
-                <option value="exclusivo-analista">Analista TI</option>
-                <option value="exclusivo-tecnico">Técnico</option>
-              </select>
-              <label className="flex-row text-xs"><input type="checkbox" checked={ncStudy} onChange={e => setNcStudy(e.target.checked)} /> Setar para hoje</label>
+
+            {/* Questões e Domínio */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div>
+                <label className="text-xs muted">Domínio</label>
+                <select className="field" value={sheetMastery} onChange={e => setSheetMastery(Number(e.target.value))}>
+                  <option value={1}>1/5</option><option value={2}>2/5</option><option value={3}>3/5</option><option value={4}>4/5</option><option value={5}>5/5</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs muted">Acertos</label>
+                <input type="number" min={0} className="field" value={sheetQRight} onChange={e => setSheetQRight(Number(e.target.value))} />
+              </div>
+              <div>
+                <label className="text-xs muted">Total Q.</label>
+                <input type="number" min={0} className="field" value={sheetQTotal} onChange={e => setSheetQTotal(Number(e.target.value))} />
+              </div>
             </div>
-            <div className="m3-dialog-actions">
-              <button onClick={() => setShowCustomModal(false)} className="m3-btn m3-btn-outlined m3-btn-sm">Cancelar</button>
-              <button
-                onClick={async () => {
-                  if (!ncTitle.trim()) return;
-                  await topicAction({ action: 'create', subject: ncSubject, title: ncTitle.trim(), overlap: ncOverlap, setForToday: ncStudy });
-                  setNcTitle('');
-                  setShowCustomModal(false);
-                }}
-                className="m3-btn m3-btn-filled m3-btn-sm"
-              >
-                Adicionar
-              </button>
+
+            <textarea rows={3} className="field" value={sheetNotes} onChange={e => setSheetNotes(e.target.value)} placeholder="Anotações rápidas, artigos ou dúvidas..." />
+
+            <div className="flex-row" style={{ gap: 8 }}>
+              <button onClick={() => saveStudySheet(false)} className="btn btn-outline" style={{ flex: 1 }}>Salvar</button>
+              <button onClick={() => saveStudySheet(true)} className="btn btn-primary" style={{ flex: 2 }}>Concluir + Agendar Revisão</button>
             </div>
           </div>
         </div>
