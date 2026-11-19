@@ -98,7 +98,7 @@ export function PracticeView({
       {mode === 'questoes' && (
         <>
           <div className="ds-card ds-card-body">
-            <div className="edital-toolbar" style={{ gridTemplateColumns: '1.5fr 1fr auto auto' }}>
+            <div className="practice-toolbar">
               <select
                 aria-label="Selecionar disciplina"
                 className="ds-select"
@@ -120,16 +120,18 @@ export function PracticeView({
                 Apenas não feitas / erradas
               </label>
 
-              <span className="ds-badge ds-badge-indigo">
-                {qStats.correct}/{qStats.answered} certas ({qStats.pct}%)
-              </span>
+              <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+                <span className="ds-badge ds-badge-indigo">
+                  {qStats.correct}/{qStats.answered} certas ({qStats.pct}%)
+                </span>
 
-              <button
-                onClick={() => onPracticeAction({ action: 'reset_questions', subject: selectedSubject })}
-                className="ds-btn ds-btn-ghost ds-btn-sm"
-              >
-                Refazer Apostila
-              </button>
+                <button
+                  onClick={() => onPracticeAction({ action: 'reset_questions', subject: selectedSubject })}
+                  className="ds-btn ds-btn-ghost ds-btn-sm"
+                >
+                  Refazer Apostila
+                </button>
+              </div>
             </div>
           </div>
 

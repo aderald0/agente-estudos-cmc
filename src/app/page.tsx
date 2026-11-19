@@ -636,17 +636,23 @@ export default function HomePage() {
         <div className="ds-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setShowInstallModal(false); }}>
           <div className="ds-modal" style={{ maxWidth: 460 }} role="dialog" aria-modal="true" aria-label="Instalar App no Celular">
             <div className="ds-modal-header">
-              <div className="flex-row" style={{ gap: 10 }}>
-                <span className="brand-icon"><Icons.Smartphone size={18} /></span>
+              <div className="flex-row" style={{ gap: 12 }}>
+                <img
+                  src="/icon-192.png"
+                  alt="Logo Pierre CMC 26"
+                  width={42}
+                  height={42}
+                  style={{ borderRadius: 11, flexShrink: 0, boxShadow: 'var(--sh-sm)' }}
+                />
                 <div>
-                  <h2 className="ds-modal-title">Instalar Estudos CMC no Celular</h2>
-                  <div className="text-xs muted">Acesso rápido em tela cheia como aplicativo nativo</div>
+                  <h2 className="ds-modal-title">Instalar Pierre · CMC 26</h2>
+                  <div className="text-xs muted">Ícone oficial na tela inicial e abertura em tela cheia</div>
                 </div>
               </div>
               <button onClick={() => setShowInstallModal(false)} className="ds-icon-btn" aria-label="Fechar"><Icons.Close /></button>
             </div>
             <div className="ds-modal-body space-y">
-              <div className="ds-card ds-card-pad space-y-sm" style={{ background: 'var(--bg-subtle)' }}>
+              <div className="ds-card ds-card-pad space-y-sm" style={{ background: 'var(--c-bg)' }}>
                 <div className="flex-row" style={{ justifyContent: 'space-between' }}>
                   <strong className="text-sm">Android (Google Chrome / Edge)</strong>
                   <span className="ds-badge ds-badge-green">Recomendado</span>
@@ -654,17 +660,17 @@ export default function HomePage() {
                 <ol className="text-xs muted" style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 6 }}>
                   <li>Toque no menu de <strong>3 pontos (⋮)</strong> no canto superior direito do navegador.</li>
                   <li>Selecione <strong>&ldquo;Instalar aplicativo&rdquo;</strong> ou <strong>&ldquo;Adicionar à tela inicial&rdquo;</strong>.</li>
-                  <li>Confirme em <strong>Instalar</strong>. O ícone azul <strong>CMC 26</strong> aparecerá na sua gaveta de apps!</li>
+                  <li>Confirme em <strong>Instalar</strong>. A nova logo <strong>Pierre · CMC 26</strong> aparecerá na sua tela inicial!</li>
                 </ol>
               </div>
 
-              <div className="ds-card ds-card-pad space-y-sm" style={{ background: 'var(--bg-subtle)' }}>
+              <div className="ds-card ds-card-pad space-y-sm" style={{ background: 'var(--c-bg)' }}>
                 <div className="flex-row" style={{ justifyContent: 'space-between' }}>
                   <strong className="text-sm">iPhone &amp; iPad (Safari)</strong>
-                  <span className="ds-badge ds-badge-blue">iOS</span>
+                  <span className="ds-badge ds-badge-indigo">iOS</span>
                 </div>
                 <ol className="text-xs muted" style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 6 }}>
-                  <li>Abra este link no <strong>Safari</strong> e toque no botão <strong>Compartilhar</strong> (ícone de quadrado com seta para cima na barra inferior).</li>
+                  <li>Abra este link no <strong>Safari</strong> e toque no botão <strong>Compartilhar</strong> (quadrado com seta para cima na barra inferior).</li>
                   <li>Role a lista e toque em <strong>&ldquo;Adicionar à Tela de Início&rdquo;</strong>.</li>
                   <li>Toque em <strong>Adicionar</strong> no canto superior direito.</li>
                 </ol>

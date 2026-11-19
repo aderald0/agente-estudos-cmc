@@ -7,10 +7,12 @@ interface IconProps {
 
 export const Icons = {
   Logo: ({ size = 18 }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2L2 7l10 5 10-5-10-5z" />
-      <path d="M2 17l10 5 10-5" />
-      <path d="M2 12l10 5 10-5" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="3.5" y="10" width="4" height="9.5" rx="2" fill="currentColor" fillOpacity="0.65" />
+      <rect x="10" y="6.5" width="4" height="13" rx="2" fill="currentColor" />
+      <rect x="16.5" y="11" width="4" height="8.5" rx="2" fill="currentColor" />
+      <circle cx="18.5" cy="6.5" r="2.3" fill="#10b981" />
+      <rect x="3.5" y="21" width="17" height="1.8" rx="0.9" fill="#10b981" />
     </svg>
   ),
   Home: ({ size = 18 }: IconProps) => (
