@@ -11,10 +11,19 @@ import { TodayDashboard } from '../components/TodayDashboard';
 import { EXAM_DATE, SUBJECT_META } from '../lib/syllabus';
 import { ChatMsg, ErrorEntry, EssayEntry, Flashcard, NavTab, PracticeQuestion, StudyLog, Topic } from '../lib/types';
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
 export default function HomePage() {
   const [tab, setTab] = useState<NavTab>('hoje');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalledPwa, setIsInstalledPwa] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
 
   const [authChecked, setAuthChecked] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
@@ -97,7 +106,47 @@ export default function HomePage() {
     setTheme(saved);
     document.body.classList.toggle('dark', saved === 'dark');
     checkAuth();
+
+    if (typeof window !== 'undefined') {
+      const standalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
+      setIsInstalledPwa(standalone);
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      }
+
+      const onBeforeInstall = (e: Event) => {
+        e.preventDefault();
+        setDeferredPrompt(e as BeforeInstallPromptEvent);
+      };
+      const onAppInstalled = () => {
+        setIsInstalledPwa(true);
+        setDeferredPrompt(null);
+        setShowInstallModal(false);
+      };
+
+      window.addEventListener('beforeinstallprompt', onBeforeInstall);
+      window.addEventListener('appinstalled', onAppInstalled);
+      return () => {
+        window.removeEventListener('beforeinstallprompt', onBeforeInstall);
+        window.removeEventListener('appinstalled', onAppInstalled);
+      };
+    }
   }, [checkAuth]);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      await deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } else {
+      setShowInstallModal(true);
+    }
+  };
 
   const toggleTheme = () => {
     const next = theme === 'light' ? 'dark' : 'light';
@@ -259,6 +308,17 @@ export default function HomePage() {
           <button type="submit" disabled={authSubmitting} className="ds-btn ds-btn-primary" style={{ width: '100%' }}>
             {authSubmitting ? 'Autenticando...' : (needsSetup ? 'Criar Conta e Entrar' : 'Entrar no Painel')}
           </button>
+
+          {!isInstalledPwa && (
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              className="ds-btn ds-btn-secondary"
+              style={{ width: '100%' }}
+            >
+              <Icons.Smartphone size={15} /> Instalar App no Celular
+            </button>
+          )}
         </form>
       </div>
     );
@@ -585,6 +645,52 @@ export default function HomePage() {
               >
                 Adicionar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* INSTALL PWA MODAL */}
+      {showInstallModal && (
+        <div className="ds-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setShowInstallModal(false); }}>
+          <div className="ds-modal" style={{ maxWidth: 460 }} role="dialog" aria-modal="true" aria-label="Instalar App no Celular">
+            <div className="ds-modal-header">
+              <div className="flex-row" style={{ gap: 10 }}>
+                <span className="brand-icon"><Icons.Smartphone size={18} /></span>
+                <div>
+                  <h2 className="ds-modal-title">Instalar Estudos CMC no Celular</h2>
+                  <div className="text-xs muted">Acesso rápido em tela cheia como aplicativo nativo</div>
+                </div>
+              </div>
+              <button onClick={() => setShowInstallModal(false)} className="ds-icon-btn" aria-label="Fechar"><Icons.Close /></button>
+            </div>
+            <div className="ds-modal-body space-y">
+              <div className="ds-card ds-card-pad space-y-sm" style={{ background: 'var(--bg-subtle)' }}>
+                <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+                  <strong className="text-sm">Android (Google Chrome / Edge)</strong>
+                  <span className="ds-badge ds-badge-green">Recomendado</span>
+                </div>
+                <ol className="text-xs muted" style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 6 }}>
+                  <li>Toque no menu de <strong>3 pontos (⋮)</strong> no canto superior direito do navegador.</li>
+                  <li>Selecione <strong>&ldquo;Instalar aplicativo&rdquo;</strong> ou <strong>&ldquo;Adicionar à tela inicial&rdquo;</strong>.</li>
+                  <li>Confirme em <strong>Instalar</strong>. O ícone azul <strong>CMC 26</strong> aparecerá na sua gaveta de apps!</li>
+                </ol>
+              </div>
+
+              <div className="ds-card ds-card-pad space-y-sm" style={{ background: 'var(--bg-subtle)' }}>
+                <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+                  <strong className="text-sm">iPhone &amp; iPad (Safari)</strong>
+                  <span className="ds-badge ds-badge-blue">iOS</span>
+                </div>
+                <ol className="text-xs muted" style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 6 }}>
+                  <li>Abra este link no <strong>Safari</strong> e toque no botão <strong>Compartilhar</strong> (ícone de quadrado com seta para cima na barra inferior).</li>
+                  <li>Role a lista e toque em <strong>&ldquo;Adicionar à Tela de Início&rdquo;</strong>.</li>
+                  <li>Toque em <strong>Adicionar</strong> no canto superior direito.</li>
+                </ol>
+              </div>
+            </div>
+            <div className="ds-modal-footer">
+              <button onClick={() => setShowInstallModal(false)} className="ds-btn ds-btn-primary">Entendi</button>
             </div>
           </div>
         </div>

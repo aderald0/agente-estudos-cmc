@@ -15,11 +15,11 @@ export function middleware(request: NextRequest) {
   }
   response.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
   );
 
-  // Prevent caching of sensitive API responses
-  if (request.nextUrl.pathname.startsWith('/api/')) {
+  // Prevent caching of sensitive API responses (except public PWA icon)
+  if (request.nextUrl.pathname.startsWith('/api/') && !request.nextUrl.pathname.startsWith('/api/icon')) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   }
 
