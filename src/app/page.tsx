@@ -82,33 +82,15 @@ function renderFormattedText(md: string) {
 }
 
 const Icon = {
-  Book: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
-  ),
-  Message: () => (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-  ),
-  Calendar: () => (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-  ),
-  Checklist: () => (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-  ),
-  Layers: () => (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-  ),
-  Lock: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-  ),
-  Check: () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-  ),
-  SunMoon: () => (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M2 12h2"/><path d="M20 12h2"/></svg>
-  ),
-  Logout: () => (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-  ),
+  Chat: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  Today: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  List: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
+  More: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>,
+  Send: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
+  Lock: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+  Check: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  Theme: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M2 12h2"/><path d="M20 12h2"/></svg>,
+  Logout: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
 };
 
 export default function HomePage() {
@@ -203,11 +185,8 @@ export default function HomePage() {
       setNeedsSetup(Boolean(data.needsSetup));
       setAuthenticated(Boolean(data.authenticated));
       setUsername(data.username || null);
-      if (data.authenticated) {
-        await loadState();
-      } else {
-        setLoading(false);
-      }
+      if (data.authenticated) await loadState();
+      else setLoading(false);
     } catch {
       setDbError('Não foi possível verificar autenticação.');
       setLoading(false);
@@ -298,7 +277,6 @@ export default function HomePage() {
     return {
       anlPct: anl.length ? Math.round((anlDone / anl.length) * 100) : 0,
       tecPct: tec.length ? Math.round((tecDone / tec.length) * 100) : 0,
-      qr, qt,
       acc: qt ? `${Math.round((qr / qt) * 100)}%` : '—',
       hoursText: `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m`,
     };
@@ -406,9 +384,7 @@ export default function HomePage() {
     if (!essayText.trim()) return;
     const p = ESSAY_PROMPTS.find(x => x.id === essayId);
     setView('chat');
-    await sendMessage(
-      `Corrija esta discursiva (${p?.cargo} — ${p?.title}) pela regra 80/20 do Edital:\n\n${essayText.trim()}`
-    );
+    await sendMessage(`Corrija esta discursiva (${p?.cargo} — ${p?.title}) pela regra 80/20 do Edital:\n\n${essayText.trim()}`);
   }
 
   const essayLines = useMemo(() => {
@@ -440,11 +416,11 @@ export default function HomePage() {
 
   if (!authChecked) {
     return (
-      <div className="auth-screen">
-        <div className="auth-card space-y">
-          <div className="skeleton" style={{ height: 22, width: '65%' }} />
-          <div className="skeleton" style={{ height: 38 }} />
-          <div className="skeleton" style={{ height: 38 }} />
+      <div className="m3-auth-wrap">
+        <div className="m3-auth-card space-y">
+          <div className="skeleton" style={{ height: 24, width: '60%' }} />
+          <div className="skeleton" style={{ height: 42 }} />
+          <div className="skeleton" style={{ height: 42 }} />
         </div>
       </div>
     );
@@ -452,33 +428,33 @@ export default function HomePage() {
 
   if (!authenticated) {
     return (
-      <div className="auth-screen">
-        <form onSubmit={handleAuthSubmit} className="auth-card space-y">
+      <div className="m3-auth-wrap">
+        <form onSubmit={handleAuthSubmit} className="m3-auth-card space-y">
           <div className="flex-row" style={{ justifyContent: 'space-between' }}>
-            <div className="brand">
-              <div className="brand-mark"><Icon.Lock /></div>
+            <div className="flex-row" style={{ gap: 10 }}>
+              <span className="m3-badge primary" style={{ padding: 8, borderRadius: 10 }}><Icon.Lock /></span>
               <div>
-                <h1 style={{ fontSize: 16 }}>{needsSetup ? 'Configuração Inicial' : 'Entrar'}</h1>
+                <h1 style={{ fontSize: 18 }}>{needsSetup ? 'Configuração Inicial' : 'Entrar'}</h1>
                 <div className="text-xs muted">Câmara de Cuiabá 2026</div>
               </div>
             </div>
-            <button type="button" onClick={toggleTheme} className="btn btn-sm" aria-label="Alternar tema"><Icon.SunMoon /></button>
+            <button type="button" onClick={toggleTheme} className="m3-icon-btn" aria-label="Alternar tema"><Icon.Theme /></button>
           </div>
           <p className="text-xs muted" style={{ margin: 0 }}>
             {needsSetup
-              ? 'Crie seu usuário e senha. Depois disso, novos cadastros ficam bloqueados.'
-              : 'Acesse seu diário de estudos, revisões e mentor.'}
+              ? 'Crie seu usuário e senha. Após o cadastro inicial, novos registros ficam bloqueados.'
+              : 'Entre com suas credenciais para acessar seu plano de estudos.'}
           </p>
           <div>
             <label htmlFor="auth-user" className="text-xs muted" style={{ display: 'block', marginBottom: 4 }}>Usuário</label>
-            <input id="auth-user" type="text" required autoComplete="username" className="field" value={authUser} onChange={e => setAuthUser(e.target.value)} placeholder="ex: aderaldo" />
+            <input id="auth-user" type="text" required autoComplete="username" className="m3-field" value={authUser} onChange={e => setAuthUser(e.target.value)} placeholder="ex: aderaldo" />
           </div>
           <div>
             <label htmlFor="auth-pass" className="text-xs muted" style={{ display: 'block', marginBottom: 4 }}>Senha {needsSetup && '(mín. 8 caracteres)'}</label>
-            <input id="auth-pass" type="password" required minLength={needsSetup ? 8 : 1} autoComplete={needsSetup ? 'new-password' : 'current-password'} className="field" value={authPass} onChange={e => setAuthPass(e.target.value)} placeholder="••••••••" />
+            <input id="auth-pass" type="password" required minLength={needsSetup ? 8 : 1} autoComplete={needsSetup ? 'new-password' : 'current-password'} className="m3-field" value={authPass} onChange={e => setAuthPass(e.target.value)} placeholder="••••••••" />
           </div>
           {authError && <div className="inline-error">{authError}</div>}
-          <button type="submit" disabled={authSubmitting} className="btn btn-primary" style={{ width: '100%' }}>
+          <button type="submit" disabled={authSubmitting} className="m3-btn m3-btn-filled" style={{ width: '100%' }}>
             {authSubmitting ? 'Verificando...' : (needsSetup ? 'Criar Conta' : 'Entrar')}
           </button>
         </form>
@@ -487,66 +463,65 @@ export default function HomePage() {
   }
 
   return (
-    <div className="app-shell">
-      {/* Compact Header */}
-      <header className="topbar">
-        <div className="brand">
-          <div className="brand-mark"><Icon.Book /></div>
-          <div>
-            <h1>CMC 2026 · Estudos</h1>
-          </div>
-        </div>
-        <div className="topbar-actions">
-          <span className="tag ok">{daysLeft}d</span>
-          {username && <span className="tag hide-mobile">{username}</span>}
-          <button onClick={toggleTheme} className="btn btn-sm" aria-label="Alternar tema"><Icon.SunMoon /></button>
-          <button onClick={handleLogout} className="btn btn-sm" aria-label="Sair"><Icon.Logout /></button>
+    <div className="m3-shell">
+      {/* M3 Top App Bar */}
+      <header className="m3-top-bar">
+        <h1 className="m3-top-title">Estudos CMC 2026</h1>
+        <div className="flex-row" style={{ gap: 4 }}>
+          <span className="m3-badge primary">{daysLeft}d</span>
+          {username && <span className="m3-badge hide-mobile">{username}</span>}
+          <button onClick={toggleTheme} className="m3-icon-btn" aria-label="Alternar tema"><Icon.Theme /></button>
+          <button onClick={handleLogout} className="m3-icon-btn" aria-label="Sair"><Icon.Logout /></button>
         </div>
       </header>
 
-      {/* Responsive Nav: Top on Desktop, Bottom on Mobile */}
-      <nav className="nav-tabs" role="tablist">
-        <button role="tab" aria-selected={view === 'chat'} className={`nav-tab ${view === 'chat' ? 'active' : ''}`} onClick={() => setView('chat')}>
-          <Icon.Message /> <span>Mentor</span>
+      {/* M3 Navigation Bar (Top on Desktop, Bottom Pill Bar on Mobile) */}
+      <nav className="m3-nav" role="tablist">
+        <button role="tab" aria-selected={view === 'chat'} className={`m3-nav-item ${view === 'chat' ? 'active' : ''}`} onClick={() => setView('chat')}>
+          <span className="m3-nav-pill"><Icon.Chat /></span>
+          <span>Mentor</span>
         </button>
-        <button role="tab" aria-selected={view === 'hoje'} className={`nav-tab ${view === 'hoje' ? 'active' : ''}`} onClick={() => setView('hoje')}>
-          <Icon.Calendar /> <span>Hoje ({studyQueue.length + reviewQueue.length})</span>
+        <button role="tab" aria-selected={view === 'hoje'} className={`m3-nav-item ${view === 'hoje' ? 'active' : ''}`} onClick={() => setView('hoje')}>
+          <span className="m3-nav-pill"><Icon.Today /></span>
+          <span>Hoje ({studyQueue.length + reviewQueue.length})</span>
         </button>
-        <button role="tab" aria-selected={view === 'edital'} className={`nav-tab ${view === 'edital' ? 'active' : ''}`} onClick={() => setView('edital')}>
-          <Icon.Checklist /> <span>Edital</span>
+        <button role="tab" aria-selected={view === 'edital'} className={`m3-nav-item ${view === 'edital' ? 'active' : ''}`} onClick={() => setView('edital')}>
+          <span className="m3-nav-pill"><Icon.List /></span>
+          <span>Edital</span>
         </button>
-        <button role="tab" aria-selected={view === 'mais'} className={`nav-tab ${view === 'mais' ? 'active' : ''}`} onClick={() => setView('mais')}>
-          <Icon.Layers /> <span>Mais</span>
+        <button role="tab" aria-selected={view === 'mais'} className={`m3-nav-item ${view === 'mais' ? 'active' : ''}`} onClick={() => setView('mais')}>
+          <span className="m3-nav-pill"><Icon.More /></span>
+          <span>Mais</span>
         </button>
       </nav>
 
       {dbError && (
-        <div style={{ padding: '8px 14px', background: 'var(--danger-soft)', fontSize: 12, color: 'var(--danger)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="inline-error" style={{ borderRadius: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{dbError}</span>
-          <button onClick={loadState} className="btn btn-sm">Recarregar</button>
+          <button onClick={loadState} className="m3-btn m3-btn-outlined m3-btn-sm">Recarregar</button>
         </div>
       )}
 
-      <main className="main-area">
-        {/* VIEW 1: MENTOR (FULL WIDTH MOBILE-FIRST CHAT) */}
+      <main className="m3-main">
+        {/* VIEW 1: MENTOR */}
         {view === 'chat' && (
-          <section className="view-chat-only">
-            <div className="chat-status-bar">
-              <button onClick={() => setView('hoje')} style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                Fila: {studyQueue.length} estudar · {reviewQueue.length} revisar →
+          <section className="m3-chat-wrap">
+            <div className="m3-chat-bar">
+              <button onClick={() => setView('hoje')} style={{ color: 'var(--md-primary)', fontWeight: 500 }}>
+                Fila: {studyQueue.length} estudar · {reviewQueue.length} revisar
               </button>
               <button onClick={clearChat} className="muted" style={{ fontSize: 12 }}>Limpar chat</button>
             </div>
 
-            <div className="chat-messages">
+            <div className="m3-chat-list">
               {loading ? (
                 <div className="space-y">
-                  <div className="skeleton" style={{ height: 48, width: '75%' }} />
-                  <div className="skeleton" style={{ height: 36, width: '50%', marginLeft: 'auto' }} />
+                  <div className="skeleton" style={{ height: 52, width: '75%' }} />
+                  <div className="skeleton" style={{ height: 40, width: '50%', marginLeft: 'auto' }} />
                 </div>
               ) : chat.length === 0 ? (
-                <div className="msg assistant">
-                  <p><strong>Pronto para estudar.</strong> Pergunte o que estudar hoje, peça um quiz rápido ou me diga o que você acabou de estudar que eu salvo tudo no banco.</p>
+                <div className="m3-bubble assistant">
+                  <p><strong>Pronto para estudar.</strong> Pergunte o que estudar hoje, peça um quiz ou relate o que já concluiu.</p>
                 </div>
               ) : (
                 chat.map(m => {
@@ -554,30 +529,30 @@ export default function HomePage() {
                     let items: string[] = [];
                     try { items = JSON.parse(m.content); } catch {}
                     return (
-                      <div key={m.id} className="tool-trace">
-                        {items.map((it, idx) => <span key={idx} className="tool-chip"><Icon.Check /> {it}</span>)}
+                      <div key={m.id} className="m3-trace-row">
+                        {items.map((it, idx) => <span key={idx} className="m3-badge success"><Icon.Check /> {it}</span>)}
                       </div>
                     );
                   }
                   return (
-                    <div key={m.id} className={`msg ${m.role === 'user' ? 'user' : 'assistant'}`}>
+                    <div key={m.id} className={`m3-bubble ${m.role === 'user' ? 'user' : 'assistant'}`}>
                       {m.role === 'user' ? m.content : renderFormattedText(m.content)}
                     </div>
                   );
                 })
               )}
-              {chatBusy && <div className="msg assistant muted">Pensando...</div>}
+              {chatBusy && <div className="m3-bubble assistant muted">Atualizando...</div>}
               <div ref={chatEndRef} />
             </div>
 
-            <div className="chat-suggestions">
-              <button className="chip-btn" onClick={() => sendMessage('O que vamos estudar hoje?')}>O que estudar hoje?</button>
-              <button className="chip-btn" onClick={() => sendMessage('Tenho 1h agora, monte um bloco.')}>Tenho 1h</button>
-              <button className="chip-btn" onClick={() => sendMessage('Quiz de 3 questões Selecon do tema atual.')}>Quiz 3q</button>
-              <button className="chip-btn" onClick={() => sendMessage('Quais meus pontos fracos?')}>Pontos fracos</button>
+            <div className="m3-suggestions">
+              <button className="m3-chip" onClick={() => sendMessage('O que vamos estudar hoje?')}>O que estudar hoje?</button>
+              <button className="m3-chip" onClick={() => sendMessage('Tenho 1h agora, monte um bloco.')}>Tenho 1h</button>
+              <button className="m3-chip" onClick={() => sendMessage('Quiz de 3 questões Selecon do tema atual.')}>Quiz 3q</button>
+              <button className="m3-chip" onClick={() => sendMessage('Quais meus pontos fracos?')}>Pontos fracos</button>
             </div>
 
-            <div className="chat-input-bar">
+            <div className="m3-composer">
               <textarea
                 rows={1}
                 value={chatInput}
@@ -588,92 +563,91 @@ export default function HomePage() {
                     sendMessage();
                   }
                 }}
-                placeholder="Ex: O que estudamos hoje? / Fiz 17/20 em Atos..."
+                placeholder="Mensagem para o mentor..."
               />
-              <button disabled={chatBusy} onClick={() => sendMessage()} className="btn btn-primary" style={{ minHeight: 42, padding: '0 16px' }}>
-                Enviar
+              <button disabled={chatBusy} onClick={() => sendMessage()} className="m3-btn m3-btn-filled" style={{ width: 44, height: 44, padding: 0 }} aria-label="Enviar mensagem">
+                <Icon.Send />
               </button>
             </div>
           </section>
         )}
 
-        {/* VIEW 2: HOJE (FILA, REVISÃO, TIMER & PROGRESSO) */}
+        {/* VIEW 2: HOJE */}
         {view === 'hoje' && (
-          <section className="view space-y">
-            <div className="metrics-strip">
-              <div className="metric-cell">
-                <span className="metric-lbl">Analista TI</span>
-                <span className="metric-val">{stats.anlPct}%</span>
+          <section className="m3-view space-y">
+            <div className="m3-metrics">
+              <div className="m3-metric-card">
+                <div className="text-xs muted">Analista TI</div>
+                <div style={{ fontSize: 22, fontWeight: 500 }}>{stats.anlPct}%</div>
               </div>
-              <div className="metric-cell">
-                <span className="metric-lbl">Técnico Leg.</span>
-                <span className="metric-val">{stats.tecPct}%</span>
+              <div className="m3-metric-card">
+                <div className="text-xs muted">Técnico Leg.</div>
+                <div style={{ fontSize: 22, fontWeight: 500 }}>{stats.tecPct}%</div>
               </div>
-              <div className="metric-cell">
-                <span className="metric-lbl">Acertos</span>
-                <span className="metric-val">{stats.acc}</span>
+              <div className="m3-metric-card">
+                <div className="text-xs muted">Acertos</div>
+                <div style={{ fontSize: 22, fontWeight: 500 }}>{stats.acc}</div>
               </div>
             </div>
 
             <div className="two-col">
-              <div className="section-box">
-                <div className="section-head">
+              <div className="m3-card-outlined">
+                <div className="m3-card-head">
                   <span>Para Estudar ({studyQueue.length})</span>
-                  <button onClick={() => setView('edital')} className="text-xs" style={{ color: 'var(--accent)' }}>+ Setar</button>
+                  <button onClick={() => setView('edital')} className="m3-btn m3-btn-tonal m3-btn-sm">+ Setar</button>
                 </div>
                 {studyQueue.length === 0 ? (
-                  <div className="section-body text-xs muted">Fila vazia. Pergunte ao Mentor ou clique em + Setar.</div>
+                  <div className="m3-card-body text-xs muted">Fila vazia. Pergunte ao Mentor ou clique em + Setar.</div>
                 ) : studyQueue.map(t => (
-                  <div key={t.id} className="list-row">
+                  <div key={t.id} className="m3-list-item">
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div className="text-xs muted">{t.subject}</div>
-                      <div style={{ fontWeight: 500 }}>{t.title}</div>
+                      <div className="text-sm" style={{ fontWeight: 500 }}>{t.title}</div>
                     </div>
-                    <button onClick={() => topicAction({ action: 'complete_study', id: t.id })} className="btn btn-primary btn-sm">Concluir</button>
+                    <button onClick={() => topicAction({ action: 'complete_study', id: t.id })} className="m3-btn m3-btn-filled m3-btn-sm">Concluir</button>
                   </div>
                 ))}
               </div>
 
-              <div className="section-box">
-                <div className="section-head">
+              <div className="m3-card-outlined">
+                <div className="m3-card-head">
                   <span>Revisões 1→3→7→15d ({reviewQueue.length})</span>
                 </div>
                 {reviewQueue.length === 0 ? (
-                  <div className="section-body text-xs muted">Sem revisões agendadas ainda.</div>
+                  <div className="m3-card-body text-xs muted">Sem revisões agendadas ainda.</div>
                 ) : reviewQueue.map(t => {
                   const due = !t.next_review_date || t.next_review_date <= today;
                   return (
-                    <div key={t.id} className="list-row">
+                    <div key={t.id} className="m3-list-item">
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div className="text-xs" style={{ color: due ? 'var(--warn)' : 'var(--text-muted)' }}>
+                        <div className="text-xs" style={{ color: due ? 'var(--md-warn)' : 'var(--md-on-surface-variant)' }}>
                           {due ? 'Revisar hoje' : fmtBR(t.next_review_date)} · Ciclo {t.review_interval || 1}d
                         </div>
-                        <div style={{ fontWeight: 500 }}>{t.title}</div>
+                        <div className="text-sm" style={{ fontWeight: 500 }}>{t.title}</div>
                       </div>
-                      <button onClick={() => topicAction({ action: 'complete_review', id: t.id })} className="btn btn-sm">Revisado</button>
+                      <button onClick={() => topicAction({ action: 'complete_review', id: t.id })} className="m3-btn m3-btn-tonal m3-btn-sm">Revisado</button>
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            {/* Timer */}
-            <div className="section-box">
-              <div className="section-head">
-                <span>Timer de Foco ({stats.hoursText} totais)</span>
-                <div className="flex-row" style={{ gap: 4 }}>
-                  <button onClick={() => { setTimerRunning(false); setTimerInitial(50 * 60); setTimerSeconds(50 * 60); }} className="btn btn-sm">50m</button>
-                  <button onClick={() => { setTimerRunning(false); setTimerInitial(25 * 60); setTimerSeconds(25 * 60); }} className="btn btn-sm">25m</button>
-                  <button onClick={() => { setTimerRunning(false); setTimerInitial(15 * 60); setTimerSeconds(15 * 60); }} className="btn btn-sm">15m</button>
+            <div className="m3-card">
+              <div className="m3-card-head">
+                <span>Timer de Foco ({stats.hoursText})</span>
+                <div className="flex-row" style={{ gap: 6 }}>
+                  <button onClick={() => { setTimerRunning(false); setTimerInitial(50 * 60); setTimerSeconds(50 * 60); }} className="m3-chip">50m</button>
+                  <button onClick={() => { setTimerRunning(false); setTimerInitial(25 * 60); setTimerSeconds(25 * 60); }} className="m3-chip">25m</button>
+                  <button onClick={() => { setTimerRunning(false); setTimerInitial(15 * 60); setTimerSeconds(15 * 60); }} className="m3-chip">15m</button>
                 </div>
               </div>
-              <div className="section-body space-y">
+              <div className="m3-card-body space-y">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="mono" style={{ fontSize: 28, fontWeight: 600 }}>
+                  <span className="mono" style={{ fontSize: 30, fontWeight: 500 }}>
                     {String(Math.floor(timerSeconds / 60)).padStart(2, '0')}:{String(timerSeconds % 60).padStart(2, '0')}
                   </span>
                   <div className="flex-row">
-                    <button onClick={() => setTimerRunning(r => !r)} className="btn btn-primary">{timerRunning ? 'Pausar' : 'Iniciar'}</button>
+                    <button onClick={() => setTimerRunning(r => !r)} className="m3-btn m3-btn-filled m3-btn-sm">{timerRunning ? 'Pausar' : 'Iniciar'}</button>
                     <button
                       onClick={() => {
                         const min = Math.max(1, Math.round((timerInitial - timerSeconds) / 60) || Math.round(timerInitial / 60));
@@ -681,13 +655,13 @@ export default function HomePage() {
                         setTimerRunning(false);
                         setTimerSeconds(timerInitial);
                       }}
-                      className="btn"
+                      className="m3-btn m3-btn-outlined m3-btn-sm"
                     >
                       Salvar
                     </button>
                   </div>
                 </div>
-                <select aria-label="Tópico do timer" className="field" value={timerTopicId} onChange={e => setTimerTopicId(e.target.value)}>
+                <select aria-label="Tópico do timer" className="m3-field" value={timerTopicId} onChange={e => setTimerTopicId(e.target.value)}>
                   {topics.map(t => <option key={t.id} value={t.id}>[{t.subject}] {t.title.slice(0, 50)}</option>)}
                 </select>
               </div>
@@ -697,18 +671,18 @@ export default function HomePage() {
 
         {/* VIEW 3: EDITAL */}
         {view === 'edital' && (
-          <section className="view space-y">
+          <section className="m3-view space-y">
             <div className="two-col" style={{ gap: 8 }}>
-              <input className="field" type="text" value={fSearch} onChange={e => setFSearch(e.target.value)} placeholder="Buscar tópico, lei..." />
+              <input className="m3-field" type="text" value={fSearch} onChange={e => setFSearch(e.target.value)} placeholder="Buscar tópico, lei..." />
               <div className="two-col" style={{ gap: 8 }}>
-                <select aria-label="Cruzamento" className="field" value={fOverlap} onChange={e => setFOverlap(e.target.value)}>
+                <select aria-label="Cruzamento" className="m3-field" value={fOverlap} onChange={e => setFOverlap(e.target.value)}>
                   <option value="all">Todos</option>
                   <option value="ambos-identico">100% Comum</option>
                   <option value="ponte-peso">Ponte</option>
                   <option value="exclusivo-analista">Analista TI</option>
                   <option value="exclusivo-tecnico">Técnico</option>
                 </select>
-                <select aria-label="Disciplina" className="field" value={fSubject} onChange={e => setFSubject(e.target.value)}>
+                <select aria-label="Disciplina" className="m3-field" value={fSubject} onChange={e => setFSubject(e.target.value)}>
                   <option value="all">Disciplina</option>
                   {SUBJECT_META.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                 </select>
@@ -717,31 +691,31 @@ export default function HomePage() {
 
             <div className="flex-row" style={{ justifyContent: 'space-between' }}>
               <span className="text-xs muted">{filteredTopics.length} tópicos</span>
-              <button onClick={() => setShowCustomModal(true)} className="btn btn-primary btn-sm">+ Novo Tópico</button>
+              <button onClick={() => setShowCustomModal(true)} className="m3-btn m3-btn-tonal m3-btn-sm">+ Novo Tópico</button>
             </div>
 
-            <div className="section-box">
+            <div className="m3-card-outlined">
               {filteredTopics.map(t => {
-                const tagCls = t.overlap === 'ambos-identico' ? 'ok' : t.overlap === 'ponte-peso' ? 'warn' : t.overlap === 'exclusivo-analista' ? 'info' : 'danger';
-                const tagTxt = t.overlap === 'ambos-identico' ? 'Comum' : t.overlap === 'ponte-peso' ? 'Ponte' : t.overlap === 'exclusivo-analista' ? 'Analista TI' : 'Técnico';
+                const badgeCls = t.overlap === 'ambos-identico' ? 'success' : t.overlap === 'ponte-peso' ? 'warn' : t.overlap === 'exclusivo-analista' ? 'primary' : 'error';
+                const badgeTxt = t.overlap === 'ambos-identico' ? 'Comum' : t.overlap === 'ponte-peso' ? 'Ponte' : t.overlap === 'exclusivo-analista' ? 'Analista TI' : 'Técnico';
                 return (
-                  <div key={t.id} className="list-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+                  <div key={t.id} className="m3-list-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
                     <div>
-                      <div className="flex-row" style={{ gap: 6, marginBottom: 3 }}>
+                      <div className="flex-row" style={{ gap: 6, marginBottom: 4 }}>
                         <strong className="text-xs">{t.subject}</strong>
-                        <span className={`tag ${tagCls}`}>{tagTxt}</span>
+                        <span className={`m3-badge ${badgeCls}`}>{badgeTxt}</span>
                         <span className="text-xs muted">Nível {t.mastery}/5 {t.q_total ? `· ${t.q_right}/${t.q_total}q` : ''}</span>
                       </div>
                       <div className="text-sm" style={{ fontWeight: 500 }}>{t.title}</div>
                     </div>
                     <div className="flex-row" style={{ justifyContent: 'flex-end' }}>
-                      <button onClick={() => topicAction({ action: 'toggle_study', id: t.id })} className={`btn btn-sm ${t.study_queue ? 'btn-primary' : ''}`}>
+                      <button onClick={() => topicAction({ action: 'toggle_study', id: t.id })} className={`m3-btn m3-btn-sm ${t.study_queue ? 'm3-btn-filled' : 'm3-btn-outlined'}`}>
                         {t.study_queue ? 'Na fila' : '+ Estudar'}
                       </button>
-                      <button onClick={() => topicAction({ action: 'toggle_review', id: t.id })} className="btn btn-sm">
+                      <button onClick={() => topicAction({ action: 'toggle_review', id: t.id })} className="m3-btn m3-btn-tonal m3-btn-sm">
                         {t.review_queue ? `Rev ${fmtBR(t.next_review_date)}` : '+ Revisar'}
                       </button>
-                      <button onClick={() => setEditTopic({ ...t })} className="btn btn-sm">Editar</button>
+                      <button onClick={() => setEditTopic({ ...t })} className="m3-btn m3-btn-outlined m3-btn-sm">Editar</button>
                     </div>
                   </div>
                 );
@@ -750,18 +724,18 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* VIEW 4: MAIS (ERROS, DISCURSIVA, NOTEBOOKLM) */}
+        {/* VIEW 4: MAIS */}
         {view === 'mais' && (
-          <section className="view space-y">
-            <div className="flex-row" style={{ gap: 6 }}>
-              <button onClick={() => setMaisTab('erros')} className={`btn btn-sm ${maisTab === 'erros' ? 'btn-primary' : ''}`}>Erros ({errors.length})</button>
-              <button onClick={() => setMaisTab('discursiva')} className={`btn btn-sm ${maisTab === 'discursiva' ? 'btn-primary' : ''}`}>Discursiva</button>
-              <button onClick={() => setMaisTab('notebooklm')} className={`btn btn-sm ${maisTab === 'notebooklm' ? 'btn-primary' : ''}`}>NotebookLM &amp; Logs</button>
+          <section className="m3-view space-y">
+            <div className="flex-row" style={{ gap: 8 }}>
+              <button onClick={() => setMaisTab('erros')} className={`m3-btn m3-btn-sm ${maisTab === 'erros' ? 'm3-btn-filled' : 'm3-btn-tonal'}`}>Erros ({errors.length})</button>
+              <button onClick={() => setMaisTab('discursiva')} className={`m3-btn m3-btn-sm ${maisTab === 'discursiva' ? 'm3-btn-filled' : 'm3-btn-tonal'}`}>Discursiva</button>
+              <button onClick={() => setMaisTab('notebooklm')} className={`m3-btn m3-btn-sm ${maisTab === 'notebooklm' ? 'm3-btn-filled' : 'm3-btn-tonal'}`}>NotebookLM</button>
             </div>
 
             {maisTab === 'erros' && (
-              <div className="section-box">
-                <div className="section-head">
+              <div className="m3-card-outlined">
+                <div className="m3-card-head">
                   <span>Caderno de Erros</span>
                   <button
                     onClick={() => {
@@ -769,29 +743,29 @@ export default function HomePage() {
                       errors.forEach(e => { md += `- **${e.subject} (${e.topic}):** ${e.mistake} → ${e.correction}\n`; });
                       downloadFile(`erros_cmc_${today}.md`, md);
                     }}
-                    className="btn btn-sm"
+                    className="m3-btn m3-btn-outlined m3-btn-sm"
                   >
                     Exportar .MD
                   </button>
                 </div>
-                <div className="section-body space-y">
-                  <select aria-label="Disciplina" className="field" value={errSub} onChange={e => setErrSub(e.target.value)}>
+                <div className="m3-card-body space-y">
+                  <select aria-label="Disciplina" className="m3-field" value={errSub} onChange={e => setErrSub(e.target.value)}>
                     {SUBJECT_META.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                   </select>
-                  <input className="field" type="text" value={errTop} onChange={e => setErrTop(e.target.value)} placeholder="Assunto / Artigo" />
-                  <input className="field" type="text" value={errMis} onChange={e => setErrMis(e.target.value)} placeholder="O que você errou..." />
-                  <input className="field" type="text" value={errCor} onChange={e => setErrCor(e.target.value)} placeholder="Regra correta..." />
+                  <input className="m3-field" type="text" value={errTop} onChange={e => setErrTop(e.target.value)} placeholder="Assunto / Artigo" />
+                  <input className="m3-field" type="text" value={errMis} onChange={e => setErrMis(e.target.value)} placeholder="O que você errou..." />
+                  <input className="m3-field" type="text" value={errCor} onChange={e => setErrCor(e.target.value)} placeholder="Regra correta..." />
                   {errFormFeedback && <div className="inline-error">{errFormFeedback}</div>}
-                  <button onClick={addError} className="btn btn-primary" style={{ width: '100%' }}>Registrar Erro</button>
+                  <button onClick={addError} className="m3-btn m3-btn-filled" style={{ width: '100%' }}>Registrar Erro</button>
 
                   {errors.map(e => (
-                    <div key={e.id} style={{ padding: '10px 0', borderTop: '1px solid var(--border)' }}>
+                    <div key={e.id} style={{ padding: '10px 0', borderTop: '1px solid var(--md-outline-variant)' }}>
                       <div className="flex-row" style={{ justifyContent: 'space-between' }}>
                         <strong className="text-xs">{e.subject} — {e.topic}</strong>
                         <button onClick={() => deleteError(e.id)} className="text-xs muted">Remover</button>
                       </div>
-                      <div className="text-xs" style={{ color: 'var(--danger)', marginTop: 3 }}>Erro: {e.mistake}</div>
-                      <div className="text-xs" style={{ color: 'var(--accent)', marginTop: 2 }}>Regra: {e.correction}</div>
+                      <div className="text-xs" style={{ color: 'var(--md-error)', marginTop: 3 }}>Erro: {e.mistake}</div>
+                      <div className="text-xs" style={{ color: 'var(--md-success)', marginTop: 2 }}>Regra: {e.correction}</div>
                     </div>
                   ))}
                 </div>
@@ -799,25 +773,25 @@ export default function HomePage() {
             )}
 
             {maisTab === 'discursiva' && (
-              <div className="section-box">
-                <div className="section-head">
+              <div className="m3-card-outlined">
+                <div className="m3-card-head">
                   <span>Discursiva (20–30 linhas)</span>
-                  <span className={`tag ${essayLines >= 20 && essayLines <= 30 ? 'ok' : ''}`}>{essayLines} / 30 linhas</span>
+                  <span className={`m3-badge ${essayLines >= 20 && essayLines <= 30 ? 'success' : ''}`}>{essayLines} / 30 linhas</span>
                 </div>
-                <div className="section-body space-y">
-                  <select aria-label="Tema" className="field" value={essayId} onChange={e => setEssayId(e.target.value)}>
+                <div className="m3-card-body space-y">
+                  <select aria-label="Tema" className="m3-field" value={essayId} onChange={e => setEssayId(e.target.value)}>
                     {ESSAY_PROMPTS.map(p => <option key={p.id} value={p.id}>[{p.cargo}] {p.title}</option>)}
                   </select>
-                  <div className="text-xs muted" style={{ padding: 10, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6 }}>
+                  <div className="text-xs muted" style={{ padding: 12, background: 'var(--md-surface-container-low)', borderRadius: 8 }}>
                     {ESSAY_PROMPTS.find(x => x.id === essayId)?.desc}
                   </div>
-                  <textarea className="field" rows={10} value={essayText} onChange={e => setEssayText(e.target.value)} placeholder="Escreva sua resposta..." />
+                  <textarea className="m3-field" rows={10} value={essayText} onChange={e => setEssayText(e.target.value)} placeholder="Escreva sua resposta..." />
                   <div className="flex-row">
-                    <button onClick={correctEssayWithAgent} className="btn btn-primary" style={{ flex: 1 }}>Corrigir com Mentor</button>
-                    <button onClick={saveEssay} className="btn">Salvar</button>
+                    <button onClick={correctEssayWithAgent} className="m3-btn m3-btn-filled" style={{ flex: 1 }}>Corrigir com Mentor</button>
+                    <button onClick={saveEssay} className="m3-btn m3-btn-tonal">Salvar</button>
                   </div>
                   {essays.map(e => (
-                    <div key={e.id} className="list-row" style={{ border: '1px solid var(--border)', borderRadius: 6 }}>
+                    <div key={e.id} className="m3-list-item" style={{ padding: '8px 0' }}>
                       <span className="text-xs">[{e.cargo}] {e.title}</span>
                       <span className="text-xs muted">{fmtBR(e.date)}</span>
                     </div>
@@ -828,10 +802,10 @@ export default function HomePage() {
 
             {maisTab === 'notebooklm' && (
               <div className="space-y">
-                <div className="section-box">
-                  <div className="section-head"><span>NotebookLM &amp; Drive</span></div>
-                  <div className="section-body space-y">
-                    <a href="https://drive.google.com/drive/folders/1RU85Ck3qASnCMvCL6TgH_V6_OmwoPNTR" target="_blank" rel="noopener" className="btn btn-primary" style={{ width: '100%', textDecoration: 'none' }}>
+                <div className="m3-card-outlined">
+                  <div className="m3-card-head"><span>NotebookLM &amp; Drive</span></div>
+                  <div className="m3-card-body space-y">
+                    <a href="https://drive.google.com/drive/folders/1RU85Ck3qASnCMvCL6TgH_V6_OmwoPNTR" target="_blank" rel="noopener" className="m3-btn m3-btn-filled" style={{ width: '100%', textDecoration: 'none' }}>
                       Abrir Pasta no Google Drive
                     </a>
                     <button
@@ -844,41 +818,43 @@ export default function HomePage() {
                         errors.forEach(e => { md += `- ${e.subject}: ${e.mistake} -> ${e.correction}\n`; });
                         downloadFile(`progresso_notebooklm_${today}.md`, md);
                       }}
-                      className="btn"
+                      className="m3-btn m3-btn-tonal"
                       style={{ width: '100%' }}
                     >
                       Baixar Progresso (.md) p/ NotebookLM
                     </button>
-                    <select aria-label="Tópico" className="field" value={nlmTopicId} onChange={e => setNlmTopicId(e.target.value)}>
+                    <select aria-label="Tópico" className="m3-field" value={nlmTopicId} onChange={e => setNlmTopicId(e.target.value)}>
                       {topics.map(t => <option key={t.id} value={t.id}>[{t.subject}] {t.title.slice(0, 50)}</option>)}
                     </select>
-                    <select aria-label="Modo" className="field" value={nlmMode} onChange={e => setNlmMode(e.target.value)}>
+                    <select aria-label="Modo" className="m3-field" value={nlmMode} onChange={e => setNlmMode(e.target.value)}>
                       <option value="podcast">Audio Overview (Podcast)</option>
                       <option value="feynman">Explicação Feynman</option>
                       <option value="leiseca">Prazos &amp; Quóruns</option>
                       <option value="quiz">Simulado 10 Questões</option>
                     </select>
-                    <textarea className="field mono" rows={4} readOnly value={nlmPromptText} />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(nlmPromptText);
-                        setNlmCopied('Copiado.');
-                        setTimeout(() => setNlmCopied(''), 2000);
-                      }}
-                      className="btn btn-sm"
-                    >
-                      Copiar Prompt
-                    </button>
-                    {nlmCopied && <span className="text-xs" style={{ color: 'var(--accent)', marginLeft: 8 }}>{nlmCopied}</span>}
+                    <textarea className="m3-field mono" rows={4} readOnly value={nlmPromptText} />
+                    <div className="flex-row">
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(nlmPromptText);
+                          setNlmCopied('Copiado.');
+                          setTimeout(() => setNlmCopied(''), 2000);
+                        }}
+                        className="m3-btn m3-btn-outlined m3-btn-sm"
+                      >
+                        Copiar Prompt
+                      </button>
+                      {nlmCopied && <span className="text-xs" style={{ color: 'var(--md-success)' }}>{nlmCopied}</span>}
+                    </div>
                   </div>
                 </div>
 
-                <div className="section-box">
-                  <div className="section-head"><span>Últimas Sessões</span></div>
+                <div className="m3-card-outlined">
+                  <div className="m3-card-head"><span>Últimas Sessões</span></div>
                   {logs.length === 0 ? (
-                    <div className="section-body text-xs muted">Nenhuma sessão registrada ainda.</div>
+                    <div className="m3-card-body text-xs muted">Nenhuma sessão registrada ainda.</div>
                   ) : logs.slice(0, 12).map(l => (
-                    <div key={l.id} className="list-row">
+                    <div key={l.id} className="m3-list-item">
                       <span className="text-xs"><strong>{l.subject}</strong> · {l.title.slice(0, 32)}</span>
                       <span className="text-xs muted">{fmtBR(l.date)} · {l.minutes}m</span>
                     </div>
@@ -890,18 +866,18 @@ export default function HomePage() {
         )}
       </main>
 
-      {/* MODAL EDITAR TÓPICO */}
+      {/* M3 DIALOG: EDITAR TÓPICO */}
       {editTopic && (
-        <div className="modal-backdrop">
-          <div className="modal">
-            <div className="modal-head">
+        <div className="m3-scrim">
+          <div className="m3-dialog">
+            <div className="m3-dialog-head">
               <div>
                 <div className="text-xs muted">{editTopic.subject}</div>
                 <div className="text-sm">{editTopic.title}</div>
               </div>
-              <button onClick={() => setEditTopic(null)} aria-label="Fechar">✕</button>
+              <button onClick={() => setEditTopic(null)} className="m3-icon-btn" aria-label="Fechar">✕</button>
             </div>
-            <div className="modal-body">
+            <div className="m3-dialog-body">
               <div className="two-col" style={{ gap: 10 }}>
                 <label className="flex-row text-xs"><input type="checkbox" checked={editTopic.study_queue} onChange={e => setEditTopic({ ...editTopic, study_queue: e.target.checked })} /> Fila Estudar</label>
                 <label className="flex-row text-xs"><input type="checkbox" checked={editTopic.review_queue} onChange={e => setEditTopic({ ...editTopic, review_queue: e.target.checked })} /> Fila Revisar</label>
@@ -909,51 +885,51 @@ export default function HomePage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                 <div>
                   <label className="text-xs muted">Domínio</label>
-                  <select className="field" value={editTopic.mastery} onChange={e => setEditTopic({ ...editTopic, mastery: Number(e.target.value) })}>
+                  <select className="m3-field" value={editTopic.mastery} onChange={e => setEditTopic({ ...editTopic, mastery: Number(e.target.value) })}>
                     <option value={1}>1/5</option><option value={2}>2/5</option><option value={3}>3/5</option><option value={4}>4/5</option><option value={5}>5/5</option>
                   </select>
                 </div>
                 <div>
                   <label className="text-xs muted">Acertos</label>
-                  <input type="number" min={0} className="field" value={editTopic.q_right} onChange={e => setEditTopic({ ...editTopic, q_right: Number(e.target.value) })} />
+                  <input type="number" min={0} className="m3-field" value={editTopic.q_right} onChange={e => setEditTopic({ ...editTopic, q_right: Number(e.target.value) })} />
                 </div>
                 <div>
                   <label className="text-xs muted">Total</label>
-                  <input type="number" min={0} className="field" value={editTopic.q_total} onChange={e => setEditTopic({ ...editTopic, q_total: Number(e.target.value) })} />
+                  <input type="number" min={0} className="m3-field" value={editTopic.q_total} onChange={e => setEditTopic({ ...editTopic, q_total: Number(e.target.value) })} />
                 </div>
               </div>
-              <textarea rows={3} className="field" value={editTopic.notes} onChange={e => setEditTopic({ ...editTopic, notes: e.target.value })} placeholder="Anotações..." />
+              <textarea rows={3} className="m3-field" value={editTopic.notes} onChange={e => setEditTopic({ ...editTopic, notes: e.target.value })} placeholder="Anotações..." />
             </div>
-            <div className="modal-foot">
-              <button onClick={() => setEditTopic(null)} className="btn">Cancelar</button>
-              <button onClick={async () => { await topicAction({ action: 'update', ...editTopic }); setEditTopic(null); }} className="btn btn-primary">Salvar</button>
+            <div className="m3-dialog-actions">
+              <button onClick={() => setEditTopic(null)} className="m3-btn m3-btn-outlined m3-btn-sm">Cancelar</button>
+              <button onClick={async () => { await topicAction({ action: 'update', ...editTopic }); setEditTopic(null); }} className="m3-btn m3-btn-filled m3-btn-sm">Salvar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL NOVO TÓPICO */}
+      {/* M3 DIALOG: NOVO TÓPICO */}
       {showCustomModal && (
-        <div className="modal-backdrop">
-          <div className="modal" style={{ maxWidth: 420 }}>
-            <div className="modal-head">
+        <div className="m3-scrim">
+          <div className="m3-dialog" style={{ maxWidth: 420 }}>
+            <div className="m3-dialog-head">
               <span>Novo Tópico</span>
-              <button onClick={() => setShowCustomModal(false)} aria-label="Fechar">✕</button>
+              <button onClick={() => setShowCustomModal(false)} className="m3-icon-btn" aria-label="Fechar">✕</button>
             </div>
-            <div className="modal-body">
-              <select aria-label="Disciplina" className="field" value={ncSubject} onChange={e => setNcSubject(e.target.value)}>
+            <div className="m3-dialog-body">
+              <select aria-label="Disciplina" className="m3-field" value={ncSubject} onChange={e => setNcSubject(e.target.value)}>
                 {SUBJECT_META.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
               </select>
-              <input className="field" type="text" value={ncTitle} onChange={e => setNcTitle(e.target.value)} placeholder="Título do conteúdo..." />
-              <select aria-label="Cargo" className="field" value={ncOverlap} onChange={e => setNcOverlap(e.target.value)}>
+              <input className="m3-field" type="text" value={ncTitle} onChange={e => setNcTitle(e.target.value)} placeholder="Título do conteúdo..." />
+              <select aria-label="Cargo" className="m3-field" value={ncOverlap} onChange={e => setNcOverlap(e.target.value)}>
                 <option value="ambos-identico">Comum aos 2 Cargos</option>
                 <option value="exclusivo-analista">Analista TI</option>
                 <option value="exclusivo-tecnico">Técnico</option>
               </select>
               <label className="flex-row text-xs"><input type="checkbox" checked={ncStudy} onChange={e => setNcStudy(e.target.checked)} /> Setar para hoje</label>
             </div>
-            <div className="modal-foot">
-              <button onClick={() => setShowCustomModal(false)} className="btn">Cancelar</button>
+            <div className="m3-dialog-actions">
+              <button onClick={() => setShowCustomModal(false)} className="m3-btn m3-btn-outlined m3-btn-sm">Cancelar</button>
               <button
                 onClick={async () => {
                   if (!ncTitle.trim()) return;
@@ -961,7 +937,7 @@ export default function HomePage() {
                   setNcTitle('');
                   setShowCustomModal(false);
                 }}
-                className="btn btn-primary"
+                className="m3-btn m3-btn-filled m3-btn-sm"
               >
                 Adicionar
               </button>
