@@ -315,12 +315,13 @@ Cruzamento estratégico:
 - Legislação Municipal vale 1,75 no Analista e 1,00 no Técnico.
 - Administração Pública vale 1,00 no Analista e 1,75 (itens 1-4 de Específicos) no Técnico.
 
-REGRAS DE INTERAÇÃO ORGÂNICA:
-1. Responda em português brasileiro claro, prático e encorajador.
-2. Quando o usuário perguntar "o que vamos estudar hoje?" ou informar tempo disponível, verifique revisões vencidas (rd <= today) e tópicos de alta prioridade nos 2 cargos, proponha um plano objetivo e USE set_study_queue para já deixar os tópicos marcados para hoje.
-3. Sempre que o usuário relatar o que estudou, quantas questões acertou, uma revisão concluída ou um erro cometido, USE IMEDIATAMENTE as ferramentas (log_study_session, mark_review_done, schedule_review, add_error_entry) para persistir no banco PostgreSQL.
-4. Ao aplicar quizzes estilo Selecon (A, B, C, D), corrija a resposta do usuário no turno seguinte e salve os acertos com log_study_session.
-5. Use apenas topic_ids existentes no JSON abaixo.
+REGRAS DE INTERAÇÃO E ECONOMIA DE TOKENS (OBRIGATÓRIO):
+1. Seja ULTRA-CONCISO e direto ao ponto (máximo 120 palavras por resposta, exceto quando corrigir discursiva ou dar explicação pedida).
+2. PROIBIDO usar tabelas markdown ("| ... |"), PROIBIDO usar emojis, PROIBIDO usar separadores "---" ou títulos "###". Use apenas texto curto e bullets simples ("- ").
+3. Quando o usuário perguntar "o que vamos estudar hoje?" ou informar tempo disponível, cheque revisões vencidas (rd <= today) e tópicos de alta prioridade, USE set_study_queue para marcar na fila e responda em no máximo 3 bullets curtos (Nome do tópico + tempo sugerido) + 1 pergunta rápida.
+4. Sempre que o usuário relatar o que estudou, acertos, revisão feita ou erro cometido, USE IMEDIATAMENTE as ferramentas (log_study_session, mark_review_done, schedule_review, add_error_entry) e confirme em 1 frase curta.
+5. Ao aplicar quizzes estilo Selecon (A, B, C, D), faça enunciados curtos e objetivos.
+6. Use apenas topic_ids existentes no JSON abaixo.
 
 ESTADO ATUAL DO ALUNO NO NEON (JSON):
 ${JSON.stringify(snapshot)}`;
@@ -351,7 +352,7 @@ ${JSON.stringify(snapshot)}`;
             system_instruction: { parts: [{ text: systemPrompt }] },
             contents: history,
             tools: AGENT_TOOLS,
-            generationConfig: { temperature: 0.5 },
+            generationConfig: { temperature: 0.4, maxOutputTokens: 450 },
           }),
         });
         if (res.ok) break;
