@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentSession, verifySameOrigin } from '../../../lib/auth';
-import { addDaysISO, ensureSchema, getSql, todayISO } from '../../../lib/db';
+import { addDaysISO, DEFAULT_PLAN_ID, ensureSchema, getSql, todayISO } from '../../../lib/db';
 
 export async function POST(req: Request) {
   if (!verifySameOrigin(req)) return NextResponse.json({ error: 'Origem não autorizada' }, { status: 403 });
@@ -10,14 +10,15 @@ export async function POST(req: Request) {
     await ensureSchema();
     const sql = getSql();
     const body = await req.json();
+    const planId = String(body.plan_id || DEFAULT_PLAN_ID);
 
     if (body.action === 'create') {
       const id = `custom-${Date.now()}`;
       const today = todayISO();
       const sq = body.setForToday !== false;
       await sql`
-        INSERT INTO topics (id, subject, title, overlap, priority, status, study_queue, study_date, sort_order)
-        VALUES (${id}, ${body.subject || 'Legislação Municipal'}, ${body.title}, ${body.overlap || 'ambos-identico'}, 'alta', ${sq ? 'estudando' : 'nao-iniciado'}, ${sq}, ${sq ? today : ''}, 999)
+        INSERT INTO topics (id, plan_id, subject, title, overlap, priority, status, study_queue, study_date, sort_order)
+        VALUES (${id}, ${planId}, ${body.subject || 'Geral'}, ${body.title}, ${body.overlap || 'ambos-identico'}, 'alta', ${sq ? 'estudando' : 'nao-iniciado'}, ${sq}, ${sq ? today : ''}, 999)
       `;
       return NextResponse.json({ ok: true, id });
     }
@@ -61,8 +62,8 @@ export async function POST(req: Request) {
         WHERE id = ${body.id}
       `;
       await sql`
-        INSERT INTO study_logs (date, topic_id, subject, title, minutes, kind)
-        VALUES (${today}, ${t.id}, ${t.subject}, ${t.title}, ${mins}, 'Estudo concluído → Rev. +1d')
+        INSERT INTO study_logs (plan_id, date, topic_id, subject, title, minutes, kind)
+        VALUES (${t.plan_id || planId}, ${today}, ${t.id}, ${t.subject}, ${t.title}, ${mins}, 'Estudo concluído → Rev. +1d')
       `;
       return NextResponse.json({ ok: true });
     }
@@ -90,7 +91,7 @@ export async function POST(req: Request) {
         nextInt = 1;
         nextDate = addDaysISO(today, 1);
         mastery = Math.max(1, mastery - 1);
-        kind = 'SRS Adaptativo (<60% ou difícil) → Reiniciado +1d';
+        kind = 'Revisão reforçada → +1d';
       } else if (idx >= 0 && idx < seq.length - 1) {
         nextInt = seq[idx + 1];
         nextDate = addDaysISO(today, nextInt);
@@ -112,8 +113,8 @@ export async function POST(req: Request) {
         WHERE id = ${body.id}
       `;
       await sql`
-        INSERT INTO study_logs (date, topic_id, subject, title, minutes, kind)
-        VALUES (${today}, ${t.id}, ${t.subject}, ${t.title}, 15, ${kind})
+        INSERT INTO study_logs (plan_id, date, topic_id, subject, title, minutes, kind)
+        VALUES (${t.plan_id || planId}, ${today}, ${t.id}, ${t.subject}, ${t.title}, 15, ${kind})
       `;
       return NextResponse.json({ ok: true });
     }
@@ -126,8 +127,8 @@ export async function POST(req: Request) {
       const nextStatus = t.status === 'nao-iniciado' ? 'estudando' : t.status;
       await sql`UPDATE topics SET minutes_studied = minutes_studied + ${mins}, status = ${nextStatus} WHERE id = ${body.id}`;
       await sql`
-        INSERT INTO study_logs (date, topic_id, subject, title, minutes, kind)
-        VALUES (${todayISO()}, ${t.id}, ${t.subject}, ${t.title}, ${mins}, 'Timer de Foco')
+        INSERT INTO study_logs (plan_id, date, topic_id, subject, title, minutes, kind)
+        VALUES (${t.plan_id || planId}, ${todayISO()}, ${t.id}, ${t.subject}, ${t.title}, ${mins}, 'Sessão de foco')
       `;
       return NextResponse.json({ ok: true });
     }

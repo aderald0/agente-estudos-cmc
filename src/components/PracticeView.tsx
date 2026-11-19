@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { SUBJECT_META } from '../lib/syllabus';
-import { Flashcard, fmtBR, PracticeQuestion } from '../lib/types';
+import { Flashcard, fmtBR, PracticeQuestion, StudyPlan } from '../lib/types';
 import { Icons } from './Icons';
 
 interface PracticeViewProps {
+  activePlan?: StudyPlan | null;
   questions: PracticeQuestion[];
   flashcards: Flashcard[];
   onPracticeAction: (payload: Record<string, unknown>) => Promise<void>;
@@ -16,24 +17,40 @@ interface PracticeViewProps {
 }
 
 export function PracticeView({
+  activePlan,
   questions,
   flashcards,
   onPracticeAction,
   onExplainWithMentor,
 }: PracticeViewProps) {
+  const isCmcPlan = !activePlan || activePlan.id === 'cmc-2026' || activePlan.category === 'concurso-duplo';
   const [mode, setMode] = useState<'questoes' | 'flashcards'>('questoes');
-  const [selectedSubject, setSelectedSubject] = useState<string>('Legislação Municipal');
+  const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [onlyUnansweredOrWrong, setOnlyUnansweredOrWrong] = useState(false);
+
+  const availableSubjects = useMemo(() => {
+    if (isCmcPlan) return SUBJECT_META.map(s => s.name);
+    const set = new Set<string>();
+    questions.forEach(q => { if (q.subject) set.add(q.subject); });
+    flashcards.forEach(f => { if (f.subject) set.add(f.subject); });
+    return Array.from(set);
+  }, [isCmcPlan, questions, flashcards]);
 
   // Flashcards state
   const [fcSubject, setFcSubject] = useState<string>('all');
   const [fcIdx, setFcIdx] = useState(0);
   const [fcFlipped, setFcFlipped] = useState(false);
   const [showNewFc, setShowNewFc] = useState(false);
-  const [newFcSub, setNewFcSub] = useState(SUBJECT_META[6].name);
+  const [newFcSub, setNewFcSub] = useState(availableSubjects[0] || 'Geral');
   const [newFcFront, setNewFcFront] = useState('');
   const [newFcBack, setNewFcBack] = useState('');
   const [newFcTag, setNewFcTag] = useState('');
+
+  useEffect(() => {
+    setSelectedSubject(isCmcPlan ? 'Legislação Municipal' : 'all');
+    setFcSubject('all');
+    setNewFcSub(availableSubjects[0] || 'Geral');
+  }, [activePlan?.id, isCmcPlan, availableSubjects]);
 
   const filteredQuestions = useMemo(() => {
     return questions.filter(q => {
@@ -77,37 +94,39 @@ export function PracticeView({
             className={`ds-seg-item ${mode === 'questoes' ? 'active' : ''}`}
             onClick={() => setMode('questoes')}
           >
-            Banco 200 Questões Selecon ({questions.filter(q => q.user_choice).length}/{questions.length})
+            Questões ({questions.filter(q => q.user_choice).length}/{questions.length})
           </button>
           <button
             className={`ds-seg-item ${mode === 'flashcards' ? 'active' : ''}`}
             onClick={() => setMode('flashcards')}
           >
-            Flashcards Flip ({flashcards.length})
+            Cartões de memória ({flashcards.length})
           </button>
         </div>
 
         {mode === 'flashcards' && (
           <button onClick={() => setShowNewFc(s => !s)} className="ds-btn ds-btn-primary ds-btn-sm">
-            <Icons.Plus size={14} /> Novo Card
+            <Icons.Plus size={14} /> Novo Cartão
           </button>
         )}
       </div>
 
-      {/* MODO 1: BANCO DE 200 QUESTÕES DAS APOSTILAS */}
+      {/* MODO 1: QUESTÕES */}
       {mode === 'questoes' && (
         <>
           <div className="ds-card ds-card-body">
             <div className="practice-toolbar">
               <select
-                aria-label="Selecionar disciplina"
+                aria-label="Selecionar matéria"
                 className="ds-select"
                 value={selectedSubject}
                 onChange={e => setSelectedSubject(e.target.value)}
               >
-                <option value="all">Todas as 10 Apostilas (200 questões)</option>
-                {SUBJECT_META.map(s => (
-                  <option key={s.name} value={s.name}>{s.name} (20 questões)</option>
+                <option value="all">Todas as matérias ({questions.length} questões)</option>
+                {availableSubjects.map(subName => (
+                  <option key={subName} value={subName}>
+                    {subName} ({questions.filter(q => q.subject === subName).length})
+                  </option>
                 ))}
               </select>
 
@@ -129,7 +148,7 @@ export function PracticeView({
                   onClick={() => onPracticeAction({ action: 'reset_questions', subject: selectedSubject })}
                   className="ds-btn ds-btn-ghost ds-btn-sm"
                 >
-                  Refazer Apostila
+                  Refazer
                 </button>
               </div>
             </div>
@@ -138,8 +157,8 @@ export function PracticeView({
           {filteredQuestions.length === 0 ? (
             <div className="ds-card empty-box">
               <div className="empty-icon"><Icons.Check size={20} /></div>
-              <div className="empty-title">Todas as questões deste filtro foram acertadas!</div>
-              <p className="empty-desc">Desmarque o filtro ou escolha outra apostila para continuar praticando.</p>
+              <div className="empty-title">Nenhuma questão pendente neste filtro</div>
+              <p className="empty-desc">Desmarque o filtro ou escolha outra matéria para continuar praticando.</p>
             </div>
           ) : (
             <div className="space-y">
@@ -157,7 +176,7 @@ export function PracticeView({
                       </div>
                       {answered && (
                         <span className={`ds-badge ${q.is_correct ? 'ds-badge-green' : 'ds-badge-red'}`}>
-                          {q.is_correct ? '✓ Você acertou' : `✗ Gabarito oficial: (${q.answer})`}
+                          {q.is_correct ? '✓ Você acertou' : `✗ Gabarito: (${q.answer})`}
                         </span>
                       )}
                     </div>
@@ -205,12 +224,12 @@ export function PracticeView({
                                       subject: q.subject,
                                       topic: `Questão #${q.qnum} · ${q.stem.slice(0, 90)}...`,
                                       mistake: `Marquei ${chosenDesc}`,
-                                      correction: `Gabarito oficial: ${rightDesc}`,
+                                      correction: `Gabarito: ${rightDesc}`,
                                     }
                                   : undefined;
 
                               onExplainWithMentor(
-                                `Explique de forma direta e objetiva a Questão #${q.qnum} de ${q.subject}:\nEnunciado: "${q.stem}"\nAlternativa que marquei: ${chosenDesc}\nGabarito oficial: ${rightDesc}\nExplique por que o gabarito oficial está correto e qual a pegadinha da alternativa marcada.`,
+                                `Explique de forma direta e objetiva a Questão #${q.qnum} de ${q.subject}:\nEnunciado: "${q.stem}"\nAlternativa que marquei: ${chosenDesc}\nGabarito oficial: ${rightDesc}\nExplique por que o gabarito está correto e qual o erro da alternativa marcada.`,
                                 autoError
                               );
                             }}
@@ -229,30 +248,34 @@ export function PracticeView({
         </>
       )}
 
-      {/* MODO 2: DECK DE FLASHCARDS FLIP */}
+      {/* MODO 2: CARTÕES DE MEMÓRIA */}
       {mode === 'flashcards' && (
         <div className="space-y">
           {showNewFc && (
             <div className="ds-card ds-card-body space-y">
               <div className="flex-row" style={{ justifyContent: 'space-between' }}>
-                <strong className="text-sm">Criar Novo Flashcard de Memorização</strong>
+                <strong className="text-sm">Criar Novo Cartão de Memória</strong>
                 <button onClick={() => setShowNewFc(false)} className="ds-icon-btn"><Icons.Close size={15} /></button>
               </div>
               <div className="bento-two">
                 <div>
-                  <label className="field-label">Disciplina</label>
-                  <select className="ds-select" value={newFcSub} onChange={e => setNewFcSub(e.target.value)}>
-                    {SUBJECT_META.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
-                  </select>
+                  <label className="field-label">Matéria / Unidade</label>
+                  <input
+                    className="ds-input"
+                    type="text"
+                    value={newFcSub}
+                    onChange={e => setNewFcSub(e.target.value)}
+                    placeholder="Ex: Unidade 1 / Direito Constitucional"
+                  />
                 </div>
                 <div>
-                  <label className="field-label">Tag / Artigo</label>
-                  <input className="ds-input" type="text" value={newFcTag} onChange={e => setNewFcTag(e.target.value)} placeholder="Ex: LOM Art. 14 / Quórum" />
+                  <label className="field-label">Referência / Tag</label>
+                  <input className="ds-input" type="text" value={newFcTag} onChange={e => setNewFcTag(e.target.value)} placeholder="Ex: Conceito / Fórmula / Artigo" />
                 </div>
               </div>
               <div>
                 <label className="field-label">Frente (Pergunta Direta)</label>
-                <input className="ds-input" type="text" value={newFcFront} onChange={e => setNewFcFront(e.target.value)} placeholder="Qual o prazo ou diferença entre..." />
+                <input className="ds-input" type="text" value={newFcFront} onChange={e => setNewFcFront(e.target.value)} placeholder="Qual a diferença entre..." />
               </div>
               <div>
                 <label className="field-label">Verso (Resposta Objetiva)</label>
@@ -263,17 +286,17 @@ export function PracticeView({
                   if (!newFcFront.trim() || !newFcBack.trim()) return;
                   await onPracticeAction({
                     action: 'create_flashcard',
-                    subject: newFcSub,
+                    subject: newFcSub || 'Geral',
                     front: newFcFront,
                     back: newFcBack,
-                    tag: newFcTag || 'Personalizado',
+                    tag: newFcTag || 'Conceito',
                   });
                   setNewFcFront(''); setNewFcBack(''); setNewFcTag('');
                   setShowNewFc(false);
                 }}
                 className="ds-btn ds-btn-primary"
               >
-                Salvar Flashcard
+                Salvar Cartão
               </button>
             </div>
           )}
@@ -281,17 +304,17 @@ export function PracticeView({
           <div className="ds-card ds-card-body">
             <div className="flex-row" style={{ justifyContent: 'space-between' }}>
               <select
-                aria-label="Filtrar flashcards por disciplina"
+                aria-label="Filtrar cartões por matéria"
                 className="ds-select"
                 style={{ maxWidth: 340 }}
                 value={fcSubject}
                 onChange={e => { setFcSubject(e.target.value); setFcIdx(0); setFcFlipped(false); }}
               >
-                <option value="all">Todas as Disciplinas ({flashcards.length} cards)</option>
-                {SUBJECT_META.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                <option value="all">Todas as matérias ({flashcards.length} cartões)</option>
+                {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
               <span className="text-xs muted">
-                Card {filteredFlashcards.length ? (fcIdx % filteredFlashcards.length) + 1 : 0} de {filteredFlashcards.length}
+                Cartão {filteredFlashcards.length ? (fcIdx % filteredFlashcards.length) + 1 : 0} de {filteredFlashcards.length}
               </span>
             </div>
           </div>
@@ -312,7 +335,7 @@ export function PracticeView({
 
                 <div className="flashcard-content">
                   <div className="text-xs muted" style={{ textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, fontWeight: 700 }}>
-                    {fcFlipped ? 'Verso · Resposta Oficial' : 'Frente · Pergunta (Clique para virar)'}
+                    {fcFlipped ? 'Resposta' : 'Pergunta (Toque para virar)'}
                   </div>
                   <div style={{ fontSize: 16.5, fontWeight: 600, lineHeight: 1.55 }}>
                     {fcFlipped ? currentCard.back : currentCard.front}
@@ -324,20 +347,20 @@ export function PracticeView({
 
               <div className="flashcard-controls">
                 <button onClick={() => gradeCard('again')} className="ds-btn ds-btn-secondary" style={{ borderColor: 'var(--c-error)', color: 'var(--c-error)' }}>
-                  Errei · Revisar Amanhã (+1d)
+                  Rever amanhã
                 </button>
                 <button onClick={() => gradeCard('good')} className="ds-btn ds-btn-secondary">
-                  Bom · +3 dias
+                  Bom · 3 dias
                 </button>
                 <button onClick={() => gradeCard('easy')} className="ds-btn ds-btn-primary">
-                  Fácil · +7 dias
+                  Fácil · 7 dias
                 </button>
               </div>
             </div>
           ) : (
             <div className="ds-card empty-box">
-              <div className="empty-title">Nenhum flashcard nesta disciplina</div>
-              <p className="empty-desc">Clique em &ldquo;+ Novo Card&rdquo; ou peça ao Mentor para gerar flashcards.</p>
+              <div className="empty-title">Nenhum cartão nesta matéria</div>
+              <p className="empty-desc">Clique em &ldquo;+ Novo Cartão&rdquo; ou peça ao Mentor para criar cartões de memória.</p>
             </div>
           )}
         </div>

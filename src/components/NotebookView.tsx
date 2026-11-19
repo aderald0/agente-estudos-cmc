@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ESSAY_PROMPTS, SUBJECT_META } from '../lib/syllabus';
-import { ErrorEntry, EssayEntry, fmtBR, StudyLog, Topic } from '../lib/types';
+import { ErrorEntry, EssayEntry, fmtBR, StudyLog, StudyPlan, Topic } from '../lib/types';
 import { Icons } from './Icons';
 
 interface NotebookViewProps {
+  activePlan?: StudyPlan | null;
   topics: Topic[];
   errors: ErrorEntry[];
   essays: EssayEntry[];
@@ -17,6 +18,7 @@ interface NotebookViewProps {
 }
 
 export function NotebookView({
+  activePlan,
   topics,
   errors,
   essays,
@@ -26,19 +28,37 @@ export function NotebookView({
   onSaveEssay,
   onCorrectEssayWithMentor,
 }: NotebookViewProps) {
+  const isCmcPlan = !activePlan || activePlan.id === 'cmc-2026' || activePlan.category === 'concurso-duplo';
+  const hasEssay = activePlan ? Boolean(activePlan.has_essay) : true;
+
+  const availableSubjects = useMemo(() => {
+    if (isCmcPlan) return SUBJECT_META.map(s => s.name);
+    const s = Array.from(new Set(topics.map(t => t.subject)));
+    return s.length > 0 ? s : ['Geral'];
+  }, [isCmcPlan, topics]);
+
   const [tab, setTab] = useState<'erros' | 'discursiva' | 'notebooklm'>('erros');
-  const [errSub, setErrSub] = useState(SUBJECT_META[0].name);
+  const [errSub, setErrSub] = useState(availableSubjects[0] || 'Geral');
   const [errTop, setErrTop] = useState('');
   const [errMis, setErrMis] = useState('');
   const [errCor, setErrCor] = useState('');
   const [errMsg, setErrMsg] = useState('');
 
   const [essayId, setEssayId] = useState(ESSAY_PROMPTS[0].id);
+  const [customEssayTitle, setCustomEssayTitle] = useState('');
   const [essayText, setEssayText] = useState('');
 
   const [nlmTopicId, setNlmTopicId] = useState(topics[0]?.id || '');
   const [nlmMode, setNlmMode] = useState('podcast');
   const [nlmCopied, setNlmCopied] = useState('');
+
+  useEffect(() => {
+    if (!hasEssay && tab === 'discursiva') {
+      setTab('erros');
+    }
+    setErrSub(availableSubjects[0] || 'Geral');
+    if (topics[0]) setNlmTopicId(topics[0].id);
+  }, [hasEssay, tab, availableSubjects, topics]);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -50,14 +70,15 @@ export function NotebookView({
   const nlmPrompt = useMemo(() => {
     const t = topics.find(x => x.id === nlmTopicId) || topics[0];
     if (!t) return '';
+    const studyName = activePlan?.title || 'Câmara Municipal de Cuiabá 2026';
     const map: Record<string, string> = {
-      podcast: `[Personalizar Audio Overview]\nRevisão direta em português para o concurso CMC 2026 (Selecon). Tema: ${t.subject} — ${t.title}. Prazos, exceções e 3 perguntas V/F no final.`,
-      feynman: `Explique "${t.title}" (${t.subject}) para o concurso CMC 2026 (Selecon) de forma simples, com 5 pegadinhas e resumo rápido.`,
-      leiseca: `Extraia todos os PRAZOS, QUÓRUNS e artigos exatos sobre "${t.title}" (${t.subject}).`,
-      quiz: `Crie 10 questões estilo Selecon sobre "${t.title}" (${t.subject}) com gabarito comentado ao final.`,
+      podcast: `[Personalizar Audio Overview]\nRevisão direta em português para ${studyName}. Tema: ${t.subject} — ${t.title}. Conceitos essenciais, pegadinhas e 3 perguntas rápidas no final.`,
+      feynman: `Explique "${t.title}" (${t.subject}) para meu estudo de ${studyName} de forma simples e direta, com os 5 pontos mais cobrados em provas.`,
+      leiseca: `Extraia todos os conceitos, regras, fórmulas ou artigos essenciais sobre "${t.title}" (${t.subject}).`,
+      quiz: `Crie 10 questões práticas sobre "${t.title}" (${t.subject}) com gabarito comentado ao final.`,
     };
     return map[nlmMode] || '';
-  }, [topics, nlmTopicId, nlmMode]);
+  }, [topics, nlmTopicId, nlmMode, activePlan]);
 
   function downloadFile(name: string, content: string, mime = 'text/markdown') {
     const blob = new Blob([content], { type: `${mime};charset=utf-8` });
@@ -70,7 +91,7 @@ export function NotebookView({
   async function submitError(e: React.FormEvent) {
     e.preventDefault();
     if (!errMis.trim() || !errCor.trim()) {
-      setErrMsg('Descreva o erro cometido e a regra correta.');
+      setErrMsg('Descreva a dúvida/erro e o conceito correto.');
       return;
     }
     setErrMsg('');
@@ -85,15 +106,18 @@ export function NotebookView({
 
   return (
     <div className="ds-container">
-      <div className="ds-segmented" style={{ maxWidth: 460 }}>
+      {/* Organic Subnavigation: Only displays Discursiva if the study plan actually has a discursive exam */}
+      <div className="ds-segmented" style={{ maxWidth: hasEssay ? 480 : 340 }}>
         <button className={`ds-seg-item ${tab === 'erros' ? 'active' : ''}`} onClick={() => setTab('erros')}>
           Caderno de Erros ({errors.length})
         </button>
-        <button className={`ds-seg-item ${tab === 'discursiva' ? 'active' : ''}`} onClick={() => setTab('discursiva')}>
-          Discursiva (20–30l)
-        </button>
+        {hasEssay && (
+          <button className={`ds-seg-item ${tab === 'discursiva' ? 'active' : ''}`} onClick={() => setTab('discursiva')}>
+            Discursiva (20–30l)
+          </button>
+        )}
         <button className={`ds-seg-item ${tab === 'notebooklm' ? 'active' : ''}`} onClick={() => setTab('notebooklm')}>
-          NotebookLM &amp; Logs
+          Fontes &amp; Histórico
         </button>
       </div>
 
@@ -102,28 +126,28 @@ export function NotebookView({
           <form onSubmit={submitError} className="ds-card">
             <div className="ds-card-header">
               <div>
-                <h2 className="ds-card-title">Novo Registro de Erro</h2>
-                <p className="ds-card-desc">Transforme questões erradas em revisão ativa</p>
+                <h2 className="ds-card-title">Registrar ponto de atenção</h2>
+                <p className="ds-card-desc">Transforme questões erradas em revisão rápida antes da prova</p>
               </div>
             </div>
             <div className="ds-card-body space-y">
               <div>
-                <label className="field-label">Disciplina</label>
+                <label className="field-label">Matéria / Unidade</label>
                 <select className="ds-select" value={errSub} onChange={e => setErrSub(e.target.value)}>
-                  {SUBJECT_META.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                  {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div>
-                <label className="field-label">Assunto ou Artigo de Lei</label>
-                <input className="ds-input" type="text" value={errTop} onChange={e => setErrTop(e.target.value)} placeholder="Ex: Art. 37 CF ou Quórum LOM" />
+                <label className="field-label">Assunto específico</label>
+                <input className="ds-input" type="text" value={errTop} onChange={e => setErrTop(e.target.value)} placeholder="Ex: Índices B+ Tree / Art. 37 CF" />
               </div>
               <div>
-                <label className="field-label">O que você errou / Pegadinha</label>
-                <input className="ds-input" type="text" value={errMis} onChange={e => setErrMis(e.target.value)} placeholder="Ex: Confundi anulação com revogação..." />
+                <label className="field-label">O que você errou ou teve dúvida</label>
+                <input className="ds-input" type="text" value={errMis} onChange={e => setErrMis(e.target.value)} placeholder="Ex: Confundi o conceito..." />
               </div>
               <div>
-                <label className="field-label">Regra Correta</label>
-                <input className="ds-input" type="text" value={errCor} onChange={e => setErrCor(e.target.value)} placeholder="Ex: Anulação = ilegalidade (ex tunc)..." />
+                <label className="field-label">Conceito correto</label>
+                <input className="ds-input" type="text" value={errCor} onChange={e => setErrCor(e.target.value)} placeholder="Ex: A regra correta é..." />
               </div>
               {errMsg && <div className="inline-alert error">{errMsg}</div>}
               <button type="submit" className="ds-btn ds-btn-primary" style={{ width: '100%' }}>Salvar no Caderno</button>
@@ -133,14 +157,14 @@ export function NotebookView({
           <section className="ds-card">
             <div className="ds-card-header">
               <div>
-                <h2 className="ds-card-title">Erros Registrados ({errors.length})</h2>
-                <p className="ds-card-desc">Exporte para gerar podcasts focados no NotebookLM</p>
+                <h2 className="ds-card-title">Erros Salvos ({errors.length})</h2>
+                <p className="ds-card-desc">Pontos salvos automaticamente nas questões ou adicionados por você</p>
               </div>
               <button
                 onClick={() => {
-                  let md = `# Caderno de Erros CMC 2026 (${today})\n\n`;
+                  let md = `# Caderno de Erros — ${activePlan?.title || 'Estudos'} (${today})\n\n`;
                   errors.forEach(e => { md += `- **${e.subject} (${e.topic}):** ${e.mistake} → ${e.correction}\n`; });
-                  downloadFile(`erros_cmc_${today}.md`, md);
+                  downloadFile(`caderno_erros_${today}.md`, md);
                 }}
                 className="ds-btn ds-btn-secondary ds-btn-sm"
               >
@@ -148,7 +172,9 @@ export function NotebookView({
               </button>
             </div>
             {errors.length === 0 ? (
-              <div className="ds-card-body muted text-sm">Nenhum erro registrado ainda.</div>
+              <div className="ds-card-body muted text-sm">
+                Nenhum erro registrado ainda. Ao errar uma questão na aba Prática e pedir explicação ao Mentor, ela entra aqui automaticamente.
+              </div>
             ) : (
               <div className="activity-list">
                 {errors.map(e => (
@@ -169,31 +195,39 @@ export function NotebookView({
         </div>
       )}
 
-      {tab === 'discursiva' && (
+      {hasEssay && tab === 'discursiva' && (
         <section className="ds-card">
           <div className="ds-card-header">
             <div>
-              <h2 className="ds-card-title">Laboratório Discursiva (20 a 30 Linhas)</h2>
-              <p className="ds-card-desc">Critério oficial do Edital: 80 pts Conteúdo + 20 pts Correção Formal</p>
+              <h2 className="ds-card-title">Treino de Discursiva (20 a 30 Linhas)</h2>
+              <p className="ds-card-desc">Critério de avaliação: 80 pts Conteúdo + 20 pts Correção Formal</p>
             </div>
             <span className={`ds-badge ${essayLines >= 20 && essayLines <= 30 ? 'ds-badge-green' : 'ds-badge-neutral'}`}>
               {essayLines} / 30 linhas
             </span>
           </div>
           <div className="ds-card-body space-y">
-            <select className="ds-select" value={essayId} onChange={e => setEssayId(e.target.value)}>
-              {ESSAY_PROMPTS.map(p => <option key={p.id} value={p.id}>[{p.cargo}] {p.title}</option>)}
-            </select>
-            <div className="prompt-callout">
-              {ESSAY_PROMPTS.find(x => x.id === essayId)?.desc}
-            </div>
-
-            <div className="flex-row" style={{ gap: 14, fontSize: 12, color: 'var(--c-text-muted)' }}>
-              <span>✓ Checklist Selecon:</span>
-              <span>• 20 a 30 linhas</span>
-              <span>• Responder aos 3 quesitos (80 pts)</span>
-              <span>• Linguagem impessoal &amp; coesão (20 pts)</span>
-            </div>
+            {isCmcPlan ? (
+              <>
+                <select className="ds-select" value={essayId} onChange={e => setEssayId(e.target.value)}>
+                  {ESSAY_PROMPTS.map(p => <option key={p.id} value={p.id}>[{p.cargo}] {p.title}</option>)}
+                </select>
+                <div className="prompt-callout">
+                  {ESSAY_PROMPTS.find(x => x.id === essayId)?.desc}
+                </div>
+              </>
+            ) : (
+              <div>
+                <label className="field-label">Tema da Discursiva / Redação</label>
+                <input
+                  className="ds-input"
+                  type="text"
+                  value={customEssayTitle}
+                  onChange={e => setCustomEssayTitle(e.target.value)}
+                  placeholder="Digite o tema proposto..."
+                />
+              </div>
+            )}
 
             <textarea
               className="ds-textarea"
@@ -208,8 +242,12 @@ export function NotebookView({
                 <button
                   onClick={async () => {
                     if (!essayText.trim()) return;
-                    const p = ESSAY_PROMPTS.find(x => x.id === essayId);
-                    await onSaveEssay({ cargo: p?.cargo || '', title: p?.title || 'Rascunho', text: essayText.trim() });
+                    const p = isCmcPlan ? ESSAY_PROMPTS.find(x => x.id === essayId) : null;
+                    await onSaveEssay({
+                      cargo: p?.cargo || activePlan?.title || 'Discursiva',
+                      title: p?.title || customEssayTitle || 'Rascunho',
+                      text: essayText.trim(),
+                    });
                     setEssayText('');
                   }}
                   className="ds-btn ds-btn-secondary"
@@ -219,21 +257,22 @@ export function NotebookView({
                 <button
                   onClick={() => {
                     if (!essayText.trim()) return;
-                    const p = ESSAY_PROMPTS.find(x => x.id === essayId);
+                    const p = isCmcPlan ? ESSAY_PROMPTS.find(x => x.id === essayId) : null;
+                    const tema = p?.title || customEssayTitle || activePlan?.title || 'Tema proposto';
                     onCorrectEssayWithMentor(
-                      `Avalie minha Prova Discursiva para ${p?.cargo} no tema "${p?.title}" seguindo o item 9.2.4 do Edital (Conteúdo 0 a 80 pts + Correção Formal 0 a 20 pts) e USE a ferramenta save_essay_evaluation para gravar minha nota no banco:\n\n${essayText.trim()}`
+                      `Avalie minha Prova Discursiva no tema "${tema}" (Conteúdo 0 a 80 pts + Correção Formal 0 a 20 pts) e USE a ferramenta save_essay_evaluation para gravar minha nota no banco:\n\n${essayText.trim()}`
                     );
                   }}
                   className="ds-btn ds-btn-primary"
                 >
-                  <Icons.Sparkles size={14} /> Corrigir &amp; Salvar Nota 80/20
+                  <Icons.Sparkles size={14} /> Corrigir com Mentor
                 </button>
               </div>
             </div>
 
             {essays.length > 0 && (
               <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: 12 }}>
-                <div className="text-xs muted" style={{ fontWeight: 600, marginBottom: 6 }}>Histórico de Discursivas &amp; Notas (80/20)</div>
+                <div className="text-xs muted" style={{ fontWeight: 600, marginBottom: 6 }}>Histórico de Correções</div>
                 {essays.map(e => {
                   const total = (e.score_content || 0) + (e.score_formal || 0);
                   return (
@@ -278,124 +317,120 @@ export function NotebookView({
         }
 
         return (
-        <div className="bento-two">
-          <section className="ds-card">
-            <div className="ds-card-header">
-              <div>
-                <h2 className="ds-card-title">Hub NotebookLM &amp; Drive</h2>
-                <p className="ds-card-desc">3 cadernos organizados sem PDFs duplicados</p>
-              </div>
-            </div>
-            <div className="ds-card-body space-y">
-              <div className="flex-row">
-                <a
-                  href="https://notebooklm.google.com"
-                  target="_blank"
-                  rel="noopener"
-                  className="ds-btn ds-btn-primary"
-                  style={{ flex: 1, textDecoration: 'none' }}
-                >
-                  Abrir NotebookLM
-                </a>
-                <a
-                  href="https://drive.google.com/drive/folders/1RU85Ck3qASnCMvCL6TgH_V6_OmwoPNTR"
-                  target="_blank"
-                  rel="noopener"
-                  className="ds-btn ds-btn-secondary"
-                  style={{ flex: 1, textDecoration: 'none' }}
-                >
-                  Pasta no Drive
-                </a>
-              </div>
-
-              <button
-                onClick={() => {
-                  let md = `# Progresso & Erros CMC 2026 (${today})\n\n`;
-                  topics.filter(t => t.mastery <= 2 || t.study_queue || t.review_queue).forEach(t => {
-                    md += `- [${t.subject}] ${t.title} (Nível ${t.mastery}/5)\n`;
-                  });
-                  md += '\n## Erros\n';
-                  errors.forEach(e => { md += `- ${e.subject}: ${e.mistake} -> ${e.correction}\n`; });
-                  downloadFile(`progresso_notebooklm_${today}.md`, md);
-                }}
-                className="ds-btn ds-btn-secondary"
-                style={{ width: '100%' }}
-              >
-                Exportar Progresso + Erros (.md) p/ subir como fonte
-              </button>
-
-              <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: 12 }} className="space-y">
-                <label className="field-label">Gerador de Prompt para NotebookLM</label>
-                <select className="ds-select" value={nlmTopicId} onChange={e => setNlmTopicId(e.target.value)}>
-                  {topics.map(t => <option key={t.id} value={t.id}>[{t.subject}] {t.title.slice(0, 50)}</option>)}
-                </select>
-                <select className="ds-select" value={nlmMode} onChange={e => setNlmMode(e.target.value)}>
-                  <option value="podcast">Audio Overview (Podcast)</option>
-                  <option value="feynman">Explicação Feynman</option>
-                  <option value="leiseca">Prazos &amp; Quóruns</option>
-                  <option value="quiz">Simulado 10 Questões</option>
-                </select>
-
-                {/* Indicação exata do Caderno */}
-                <div className="prompt-callout" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div className="flex-row" style={{ justifyContent: 'space-between' }}>
-                    <span className="text-xs" style={{ fontWeight: 700, color: 'var(--c-text)' }}>Onde colar este prompt:</span>
-                    <span className={`ds-badge ${recBadge}`}>{recNotebook}</span>
-                  </div>
-                  <span className="text-xs muted">{recReason}</span>
+          <div className="bento-two">
+            <section className="ds-card">
+              <div className="ds-card-header">
+                <div>
+                  <h2 className="ds-card-title">Áudio &amp; Resumos (NotebookLM)</h2>
+                  <p className="ds-card-desc">Gere roteiros de áudio e resumos a partir dos seus materiais</p>
                 </div>
-
-                <textarea className="ds-textarea mono" rows={4} readOnly value={nlmPrompt} />
+              </div>
+              <div className="ds-card-body space-y">
                 <div className="flex-row">
-                  <button
-                    onClick={() => { navigator.clipboard.writeText(nlmPrompt); setNlmCopied('Prompt copiado.'); setTimeout(() => setNlmCopied(''), 2000); }}
-                    className="ds-btn ds-btn-primary ds-btn-sm"
+                  <a
+                    href="https://notebooklm.google.com"
+                    target="_blank"
+                    rel="noopener"
+                    className="ds-btn ds-btn-primary"
+                    style={{ flex: 1, textDecoration: 'none' }}
                   >
-                    Copiar Prompt
-                  </button>
-                  {nlmCopied && <span className="text-xs" style={{ color: 'var(--c-success)' }}>{nlmCopied}</span>}
+                    Abrir NotebookLM
+                  </a>
+                  {isCmcPlan && (
+                    <a
+                      href="https://drive.google.com/drive/folders/1RU85Ck3qASnCMvCL6TgH_V6_OmwoPNTR"
+                      target="_blank"
+                      rel="noopener"
+                      className="ds-btn ds-btn-secondary"
+                      style={{ flex: 1, textDecoration: 'none' }}
+                    >
+                      Pasta no Drive
+                    </a>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    let md = `# Progresso & Erros — ${activePlan?.title || 'Estudos'} (${today})\n\n`;
+                    topics.filter(t => t.mastery <= 2 || t.study_queue || t.review_queue).forEach(t => {
+                      md += `- [${t.subject}] ${t.title} (Nível ${t.mastery}/5)\n`;
+                    });
+                    md += '\n## Erros\n';
+                    errors.forEach(e => { md += `- ${e.subject}: ${e.mistake} -> ${e.correction}\n`; });
+                    downloadFile(`progresso_${today}.md`, md);
+                  }}
+                  className="ds-btn ds-btn-secondary"
+                  style={{ width: '100%' }}
+                >
+                  Exportar Resumo + Erros (.md)
+                </button>
+
+                <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: 12 }} className="space-y">
+                  <label className="field-label">Roteiro para estudo por áudio ou resumo</label>
+                  <select className="ds-select" value={nlmTopicId} onChange={e => setNlmTopicId(e.target.value)}>
+                    {topics.map(t => <option key={t.id} value={t.id}>[{t.subject}] {t.title.slice(0, 50)}</option>)}
+                  </select>
+                  <select className="ds-select" value={nlmMode} onChange={e => setNlmMode(e.target.value)}>
+                    <option value="podcast">Resumo em Áudio (Podcast)</option>
+                    <option value="feynman">Explicação Simplificada</option>
+                    <option value="leiseca">Conceitos, Fórmulas &amp; Prazos</option>
+                    <option value="quiz">Simulado 10 Questões</option>
+                  </select>
+
+                  {isCmcPlan && (
+                    <div className="prompt-callout" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+                        <span className="text-xs" style={{ fontWeight: 700, color: 'var(--c-text)' }}>Onde usar:</span>
+                        <span className={`ds-badge ${recBadge}`}>{recNotebook}</span>
+                      </div>
+                      <span className="text-xs muted">{recReason}</span>
+                    </div>
+                  )}
+
+                  <textarea className="ds-textarea mono" rows={4} readOnly value={nlmPrompt} />
+                  <div className="flex-row">
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(nlmPrompt); setNlmCopied('Copiado.'); setTimeout(() => setNlmCopied(''), 2000); }}
+                      className="ds-btn ds-btn-primary ds-btn-sm"
+                    >
+                      Copiar Roteiro
+                    </button>
+                    {nlmCopied && <span className="text-xs" style={{ color: 'var(--c-success)' }}>{nlmCopied}</span>}
+                  </div>
                 </div>
               </div>
+            </section>
 
-              <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: 12 }} className="text-xs muted space-y">
-                <div style={{ fontWeight: 600, color: 'var(--c-text)' }}>Mapa rápido dos seus 3 cadernos:</div>
-                <div><strong>1. Núcleo Comum e Legislação:</strong> Português, RLM, Informática, Hist./Geo. MT, Ética, Relações, Adm. Pública e Legislação Municipal.</div>
-                <div><strong>2. Analista TI:</strong> Conhecimentos Específicos TI + Legislação Municipal + Adm. Pública.</div>
-                <div><strong>3. Técnico Legislativo:</strong> Conhecimentos Específicos Técnico + Legislação Municipal + Português.</div>
+            <section className="ds-card">
+              <div className="ds-card-header">
+                <div>
+                  <h2 className="ds-card-title">Histórico de Sessões</h2>
+                  <p className="ds-card-desc">Últimas atividades registradas neste estudo</p>
+                </div>
+                <button
+                  onClick={() => downloadFile(`backup_${today}.json`, JSON.stringify({ activePlan, topics, logs, errors, essays }, null, 2), 'application/json')}
+                  className="ds-btn ds-btn-ghost ds-btn-sm"
+                >
+                  Backup JSON
+                </button>
               </div>
-            </div>
-          </section>
-
-          <section className="ds-card">
-            <div className="ds-card-header">
-              <div>
-                <h2 className="ds-card-title">Histórico de Sessões</h2>
-                <p className="ds-card-desc">Últimas atividades registradas no Neon</p>
-              </div>
-              <button
-                onClick={() => downloadFile(`backup_cmc_${today}.json`, JSON.stringify({ topics, logs, errors, essays }, null, 2), 'application/json')}
-                className="ds-btn ds-btn-ghost ds-btn-sm"
-              >
-                Backup JSON
-              </button>
-            </div>
-            {logs.length === 0 ? (
-              <div className="ds-card-body muted text-sm">Nenhuma sessão registrada ainda.</div>
-            ) : (
-              <div className="activity-list">
-                {logs.slice(0, 15).map(l => (
-                  <div key={l.id} className="activity-row">
-                    <div>
-                      <div className="text-xs muted">{l.subject} · {l.kind}</div>
-                      <div className="text-sm" style={{ fontWeight: 500 }}>{l.title}</div>
+              {logs.length === 0 ? (
+                <div className="ds-card-body muted text-sm">Nenhuma sessão registrada ainda neste estudo.</div>
+              ) : (
+                <div className="activity-list">
+                  {logs.slice(0, 15).map(l => (
+                    <div key={l.id} className="activity-row">
+                      <div>
+                        <div className="text-xs muted">{l.subject} · {l.kind}</div>
+                        <div className="text-sm" style={{ fontWeight: 500 }}>{l.title}</div>
+                      </div>
+                      <span className="ds-badge ds-badge-neutral">{fmtBR(l.date)} · {l.minutes}m</span>
                     </div>
-                    <span className="ds-badge ds-badge-neutral">{fmtBR(l.date)} · {l.minutes}m</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
         );
       })()}
     </div>

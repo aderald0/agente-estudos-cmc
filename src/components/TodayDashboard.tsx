@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { fmtBR, NavTab, PracticeQuestion, Topic } from '../lib/types';
+import { fmtBR, NavTab, PracticeQuestion, StudyPlan, StudyPlanContextCard, Topic } from '../lib/types';
 import { Icons } from './Icons';
 
 interface TodayDashboardProps {
+  activePlan?: StudyPlan | null;
   topics: Topic[];
   questions: PracticeQuestion[];
   loading: boolean;
@@ -15,6 +16,7 @@ interface TodayDashboardProps {
 }
 
 export function TodayDashboard({
+  activePlan,
   topics,
   questions,
   loading,
@@ -29,10 +31,15 @@ export function TodayDashboard({
   const [timerRunning, setTimerRunning] = useState(false);
   const [selectedTopicId, setSelectedTopicId] = useState('');
 
+  const isCmcPlan = !activePlan || activePlan.id === 'cmc-2026' || activePlan.category === 'concurso-duplo';
+
   useEffect(() => {
-    if (!selectedTopicId && topics.length > 0) {
-      const firstQueue = topics.find(t => t.study_queue) || topics[0];
-      setSelectedTopicId(firstQueue.id);
+    if (topics.length > 0) {
+      const exists = topics.some(t => t.id === selectedTopicId);
+      if (!selectedTopicId || !exists) {
+        const firstQueue = topics.find(t => t.study_queue) || topics[0];
+        setSelectedTopicId(firstQueue.id);
+      }
     }
   }, [topics, selectedTopicId]);
 
@@ -46,6 +53,19 @@ export function TodayDashboard({
 
   const today = new Date().toISOString().slice(0, 10);
 
+  const planConfig = useMemo(() => {
+    if (!activePlan?.config_json) return { heroTitle: '', contextCards: [] as StudyPlanContextCard[] };
+    try {
+      const parsed = JSON.parse(activePlan.config_json);
+      return {
+        heroTitle: String(parsed.heroTitle || ''),
+        contextCards: Array.isArray(parsed.contextCards) ? (parsed.contextCards as StudyPlanContextCard[]) : [],
+      };
+    } catch {
+      return { heroTitle: '', contextCards: [] as StudyPlanContextCard[] };
+    }
+  }, [activePlan]);
+
   // Subject accuracy calculator combining topic manual stats + practice_questions
   const readiness = useMemo(() => {
     function getAreaStats(subjects: string[]) {
@@ -55,7 +75,6 @@ export function TodayDashboard({
         right += t.q_right || 0;
         total += t.q_total || 0;
       });
-      // Fallback: if topic stats are 0, check practice_questions table directly
       if (total === 0) {
         questions.filter(q => subjects.includes(q.subject) && q.user_choice).forEach(q => {
           total += 1;
@@ -99,6 +118,8 @@ export function TodayDashboard({
     const anlDone = anl.filter(t => t.status === 'revisar' || t.status === 'dominado').length;
     const tecDone = tec.filter(t => t.status === 'revisar' || t.status === 'dominado').length;
     const totalDone = topics.filter(t => t.status === 'revisar' || t.status === 'dominado').length;
+    const highPri = topics.filter(t => t.priority === 'alta');
+    const highPriDone = highPri.filter(t => t.status === 'revisar' || t.status === 'dominado').length;
 
     let qRight = 0;
     let qTotal = 0;
@@ -109,6 +130,13 @@ export function TodayDashboard({
       mins += t.minutes_studied || 0;
     });
 
+    if (qTotal === 0) {
+      questions.filter(q => q.user_choice).forEach(q => {
+        qTotal += 1;
+        if (q.is_correct) qRight += 1;
+      });
+    }
+
     return {
       anlPct: anl.length ? Math.round((anlDone / anl.length) * 100) : 0,
       anlDone,
@@ -116,14 +144,19 @@ export function TodayDashboard({
       tecPct: tec.length ? Math.round((tecDone / tec.length) * 100) : 0,
       tecDone,
       tecTotal: tec.length,
+      highPriPct: highPri.length ? Math.round((highPriDone / highPri.length) * 100) : 0,
+      highPriDone,
+      highPriTotal: highPri.length,
       overallPct: topics.length ? Math.round((totalDone / topics.length) * 100) : 0,
+      totalDone,
+      totalTopics: topics.length,
       qRight,
       qTotal,
       accPct: qTotal ? Math.round((qRight / qTotal) * 100) : 0,
       hours: Math.floor(mins / 60),
       minsRem: mins % 60,
     };
-  }, [topics]);
+  }, [topics, questions]);
 
   const studyQueue = useMemo(() => topics.filter(t => t.study_queue), [topics]);
   const dueReviews = useMemo(
@@ -162,162 +195,241 @@ export function TodayDashboard({
     }
   }
 
+  const syllabusWord = activePlan?.syllabus_label || 'Edital';
+
   return (
     <div className="ds-container">
-      {/* 0. PIERRE EDITORIAL HERO & LIVE AGENT INSIGHT STRIP */}
+      {/* 0. PIERRE EDITORIAL HERO & CONTEXT CARDS */}
       <section className="pierre-hero">
         <div className="pierre-hero-top">
           <div>
             <div className="pierre-eyebrow">
               <span className="pierre-live-dot" />
-              <span>Seus agentes trabalhando pela sua aprovação · Instituto Selecon</span>
+              <span>{activePlan?.subtitle || 'Seus agentes trabalhando pela sua aprovação · Instituto Selecon'}</span>
             </div>
-            <h1 className="pierre-hero-title">Você foca na leitura. O Mentor organiza sua nota.</h1>
+            <h1 className="pierre-hero-title">
+              {planConfig.heroTitle || 'Você foca na leitura. O Mentor organiza sua nota.'}
+            </h1>
           </div>
           <div className="flex-row">
             <button onClick={() => onNavigate('pratica')} className="ds-btn ds-btn-secondary">
-              <Icons.Check size={15} /> Banco 200 Questões
+              <Icons.Check size={15} /> {questions.length > 0 ? `Questões (${questions.length})` : 'Prática'}
             </button>
             <button onClick={onAskMentorPlan} className="ds-btn ds-btn-primary">
-              <Icons.Sparkles size={15} /> Pedir plano ao Mentor
+              <Icons.Sparkles size={15} /> Ajustar com Mentor
             </button>
           </div>
         </div>
 
-        <div className="pierre-agents-strip">
-          <div className="pierre-agent-pill">
-            <div className="flex-row" style={{ gap: 10 }}>
-              <span className="agent-dot-avatar">TI</span>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>Manhã · Analista de TI</div>
-                <div className="text-xs muted">Legislação + TI valem 70% da prova (peso 1,75)</div>
-              </div>
-            </div>
-            <span className="ds-badge ds-badge-green">{readiness.anlScore} pts</span>
-          </div>
-
-          <div className="pierre-agent-pill">
-            <div className="flex-row" style={{ gap: 10 }}>
-              <span className="agent-dot-avatar">TL</span>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>Tarde · Técnico Legislativo</div>
-                <div className="text-xs muted">Adm. Pública + Específicos valem 70% (peso 1,75)</div>
-              </div>
-            </div>
-            <span className="ds-badge ds-badge-green">{readiness.tecScore} pts</span>
-          </div>
-
-          <div className="pierre-agent-pill">
-            <div className="flex-row" style={{ gap: 10 }}>
-              <span className="agent-dot-avatar">SRS</span>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>Memória &amp; Revisão Espaçada</div>
-                <div className="text-xs muted">
-                  {dueReviews.length > 0 ? `${dueReviews.length} revisão(ões) pendente(s) hoje` : 'Ciclo 1→3→7→15 dias em dia'}
+        {isCmcPlan ? (
+          <div className="pierre-agents-strip">
+            <div className="pierre-agent-pill">
+              <div className="flex-row" style={{ gap: 10 }}>
+                <span className="agent-dot-avatar">TI</span>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>Manhã · Analista de TI</div>
+                  <div className="text-xs muted">Legislação + TI valem 70% da prova (peso 1,75)</div>
                 </div>
               </div>
+              <span className="ds-badge ds-badge-green">{readiness.anlScore} pts</span>
             </div>
-            <span className={`ds-badge ${dueReviews.length > 0 ? 'ds-badge-amber' : 'ds-badge-neutral'}`}>
-              {dueReviews.length} hoje
-            </span>
+
+            <div className="pierre-agent-pill">
+              <div className="flex-row" style={{ gap: 10 }}>
+                <span className="agent-dot-avatar">TL</span>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>Tarde · Técnico Legislativo</div>
+                  <div className="text-xs muted">Adm. Pública + Específicos valem 70% (peso 1,75)</div>
+                </div>
+              </div>
+              <span className="ds-badge ds-badge-green">{readiness.tecScore} pts</span>
+            </div>
+
+            <div className="pierre-agent-pill">
+              <div className="flex-row" style={{ gap: 10 }}>
+                <span className="agent-dot-avatar">REV</span>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>Revisões Agendadas</div>
+                  <div className="text-xs muted">
+                    {dueReviews.length > 0 ? `${dueReviews.length} revisão(ões) pendente(s) hoje` : 'Revisões em dia'}
+                  </div>
+                </div>
+              </div>
+              <span className={`ds-badge ${dueReviews.length > 0 ? 'ds-badge-amber' : 'ds-badge-neutral'}`}>
+                {dueReviews.length} hoje
+              </span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="pierre-agents-strip">
+            {(planConfig.contextCards.length > 0
+              ? planConfig.contextCards
+              : [
+                  { tag: 'FOCO', title: 'Prioridades', sub: `${metrics.highPriDone}/${metrics.highPriTotal} tópicos essenciais`, pill: `${metrics.highPriPct}%` },
+                  { tag: 'PRAT', title: 'Exercícios & Cartões', sub: `${questions.length} questões disponíveis`, pill: `${metrics.accPct}% acerto` },
+                  { tag: 'REV', title: 'Para revisar hoje', sub: dueReviews.length ? `${dueReviews.length} pendente(s)` : 'Em dia', pill: `${dueReviews.length} hoje` },
+                ]
+            ).map((c, idx) => (
+              <div key={idx} className="pierre-agent-pill">
+                <div className="flex-row" style={{ gap: 10 }}>
+                  <span className="agent-dot-avatar">{c.tag}</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{c.title}</div>
+                    <div className="text-xs muted">{c.sub}</div>
+                  </div>
+                </div>
+                <span className="ds-badge ds-badge-green">{c.pill}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
-      {/* 1. CABEÇALHO DE DESEMPENHO */}
-      <div className="kpi-bento">
-        <div className="kpi-tile">
-          <div className="kpi-top">
-            <span className="kpi-label">Analista de TI</span>
-            <span className="ds-badge ds-badge-indigo">{metrics.anlDone}/{metrics.anlTotal}</span>
-          </div>
-          <div className="kpi-value">{metrics.anlPct}%</div>
-          <div className="ds-progress"><div className="ds-progress-fill indigo" style={{ width: `${metrics.anlPct}%` }} /></div>
-        </div>
-
-        <div className="kpi-tile">
-          <div className="kpi-top">
-            <span className="kpi-label">Técnico Legislativo</span>
-            <span className="ds-badge ds-badge-blue">{metrics.tecDone}/{metrics.tecTotal}</span>
-          </div>
-          <div className="kpi-value">{metrics.tecPct}%</div>
-          <div className="ds-progress"><div className="ds-progress-fill blue" style={{ width: `${metrics.tecPct}%` }} /></div>
-        </div>
-
-        <div className="kpi-tile">
-          <div className="kpi-top">
-            <span className="kpi-label">Desempenho Geral</span>
-            <span className="ds-badge ds-badge-green">Edital</span>
-          </div>
-          <div className="kpi-value">{metrics.overallPct}%</div>
-          <div className="ds-progress"><div className="ds-progress-fill green" style={{ width: `${metrics.overallPct}%` }} /></div>
-        </div>
-
-        <div className="kpi-tile">
-          <div className="kpi-top">
-            <span className="kpi-label">Questões &amp; Acertos</span>
-            <span className="ds-badge ds-badge-neutral">{metrics.qTotal} feitas</span>
-          </div>
-          <div className="kpi-value">{metrics.qTotal > 0 ? `${metrics.accPct}%` : '—'}</div>
-          <div className="kpi-sub">{metrics.qRight} acertos registrados</div>
-        </div>
-
-        <div className="kpi-tile">
-          <div className="kpi-top">
-            <span className="kpi-label">Tempo Total</span>
-            <span className="ds-badge ds-badge-neutral">Foco</span>
-          </div>
-          <div className="kpi-value">{metrics.hours}h {String(metrics.minsRem).padStart(2, '0')}m</div>
-          <div className="kpi-sub">Acumulado em sessões</div>
-        </div>
-      </div>
-
-      {/* 1.5 TERMÔMETRO DE NOTA PROJETADA (EXAM READINESS 100 PTS) */}
-      <div className="bento-two">
-        <div className="ds-card ds-card-body">
-          <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>Nota Projetada · Analista TI (100 pts)</div>
-              <div className="text-xs muted">Básicos {readiness.anlBasicosPts}/15 · Gerais {readiness.anlGeraisPts}/15 · Específicos {readiness.anlEspecPts}/70 (peso 1,75)</div>
+      {/* 1. CABEÇALHO DE DESEMPENHO (ORGÂNICO CONFORME O ESTUDO) */}
+      {isCmcPlan ? (
+        <div className="kpi-bento">
+          <div className="kpi-tile">
+            <div className="kpi-top">
+              <span className="kpi-label">Analista de TI</span>
+              <span className="ds-badge ds-badge-indigo">{metrics.anlDone}/{metrics.anlTotal}</span>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: 22, fontWeight: 700 }}>{readiness.anlScore}</span>
-              <span className="text-xs muted"> /100</span>
-            </div>
+            <div className="kpi-value">{metrics.anlPct}%</div>
+            <div className="ds-progress"><div className="ds-progress-fill indigo" style={{ width: `${metrics.anlPct}%` }} /></div>
           </div>
-          <div className="ds-progress" style={{ height: 8, marginBottom: 8 }}>
-            <div className="ds-progress-fill indigo" style={{ width: `${Math.min(100, readiness.anlScore)}%` }} />
-          </div>
-          <div className="flex-row" style={{ justifyContent: 'space-between' }}>
-            <span className={`ds-badge ${readiness.anlScore >= 75 ? 'ds-badge-green' : readiness.anlScore >= 40 && !readiness.anlZeroArea ? 'ds-badge-amber' : 'ds-badge-neutral'}`}>
-              {readiness.anlScore >= 75 ? 'Competitivo (Top 100)' : readiness.anlScore >= 40 && !readiness.anlZeroArea ? 'Acima do corte (40 pts)' : 'Pratique questões nas 3 áreas'}
-            </span>
-            <button onClick={() => onNavigate('pratica')} className="ds-btn ds-btn-ghost ds-btn-sm">Praticar 200 Questões →</button>
-          </div>
-        </div>
 
-        <div className="ds-card ds-card-body">
-          <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>Nota Projetada · Técnico Leg. (100 pts)</div>
-              <div className="text-xs muted">Básicos {readiness.tecBasicosPts}/15 · Gerais {readiness.tecGeraisPts}/15 · Específicos {readiness.tecEspecPts}/70 (peso 1,75)</div>
+          <div className="kpi-tile">
+            <div className="kpi-top">
+              <span className="kpi-label">Técnico Legislativo</span>
+              <span className="ds-badge ds-badge-blue">{metrics.tecDone}/{metrics.tecTotal}</span>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: 22, fontWeight: 700 }}>{readiness.tecScore}</span>
-              <span className="text-xs muted"> /100</span>
+            <div className="kpi-value">{metrics.tecPct}%</div>
+            <div className="ds-progress"><div className="ds-progress-fill blue" style={{ width: `${metrics.tecPct}%` }} /></div>
+          </div>
+
+          <div className="kpi-tile">
+            <div className="kpi-top">
+              <span className="kpi-label">Desempenho Geral</span>
+              <span className="ds-badge ds-badge-green">Edital</span>
             </div>
+            <div className="kpi-value">{metrics.overallPct}%</div>
+            <div className="ds-progress"><div className="ds-progress-fill green" style={{ width: `${metrics.overallPct}%` }} /></div>
           </div>
-          <div className="ds-progress" style={{ height: 8, marginBottom: 8 }}>
-            <div className="ds-progress-fill blue" style={{ width: `${Math.min(100, readiness.tecScore)}%` }} />
+
+          <div className="kpi-tile">
+            <div className="kpi-top">
+              <span className="kpi-label">Questões &amp; Acertos</span>
+              <span className="ds-badge ds-badge-neutral">{metrics.qTotal} feitas</span>
+            </div>
+            <div className="kpi-value">{metrics.qTotal > 0 ? `${metrics.accPct}%` : '—'}</div>
+            <div className="kpi-sub">{metrics.qRight} acertos registrados</div>
           </div>
-          <div className="flex-row" style={{ justifyContent: 'space-between' }}>
-            <span className={`ds-badge ${readiness.tecScore >= 75 ? 'ds-badge-green' : readiness.tecScore >= 40 && !readiness.tecZeroArea ? 'ds-badge-amber' : 'ds-badge-neutral'}`}>
-              {readiness.tecScore >= 75 ? 'Competitivo (Top 220)' : readiness.tecScore >= 40 && !readiness.tecZeroArea ? 'Acima do corte (40 pts)' : 'Pratique questões nas 3 áreas'}
-            </span>
-            <button onClick={() => onNavigate('pratica')} className="ds-btn ds-btn-ghost ds-btn-sm">Abrir Flashcards Flip →</button>
+
+          <div className="kpi-tile">
+            <div className="kpi-top">
+              <span className="kpi-label">Tempo Total</span>
+              <span className="ds-badge ds-badge-neutral">Foco</span>
+            </div>
+            <div className="kpi-value">{metrics.hours}h {String(metrics.minsRem).padStart(2, '0')}m</div>
+            <div className="kpi-sub">Acumulado em sessões</div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="kpi-bento">
+          <div className="kpi-tile">
+            <div className="kpi-top">
+              <span className="kpi-label">Tópicos Prioritários</span>
+              <span className="ds-badge ds-badge-indigo">{metrics.highPriDone}/{metrics.highPriTotal}</span>
+            </div>
+            <div className="kpi-value">{metrics.highPriPct}%</div>
+            <div className="ds-progress"><div className="ds-progress-fill indigo" style={{ width: `${metrics.highPriPct}%` }} /></div>
+          </div>
+
+          <div className="kpi-tile">
+            <div className="kpi-top">
+              <span className="kpi-label">{syllabusWord} Concluída</span>
+              <span className="ds-badge ds-badge-green">{metrics.totalDone}/{metrics.totalTopics}</span>
+            </div>
+            <div className="kpi-value">{metrics.overallPct}%</div>
+            <div className="ds-progress"><div className="ds-progress-fill green" style={{ width: `${metrics.overallPct}%` }} /></div>
+          </div>
+
+          <div className="kpi-tile">
+            <div className="kpi-top">
+              <span className="kpi-label">Taxa de Acerto</span>
+              <span className="ds-badge ds-badge-neutral">{metrics.qTotal} feitas</span>
+            </div>
+            <div className="kpi-value">{metrics.qTotal > 0 ? `${metrics.accPct}%` : '—'}</div>
+            <div className="kpi-sub">{metrics.qRight} acertos registrados</div>
+          </div>
+
+          <div className="kpi-tile">
+            <div className="kpi-top">
+              <span className="kpi-label">Meta Diária</span>
+              <span className="ds-badge ds-badge-blue">Rotina</span>
+            </div>
+            <div className="kpi-value" style={{ fontSize: 22 }}>{activePlan?.daily_hours || '2h/dia'}</div>
+            <div className="kpi-sub">{studyQueue.length} atividade(s) para hoje</div>
+          </div>
+
+          <div className="kpi-tile">
+            <div className="kpi-top">
+              <span className="kpi-label">Tempo Estudado</span>
+              <span className="ds-badge ds-badge-neutral">Foco</span>
+            </div>
+            <div className="kpi-value">{metrics.hours}h {String(metrics.minsRem).padStart(2, '0')}m</div>
+            <div className="kpi-sub">Acumulado neste estudo</div>
+          </div>
+        </div>
+      )}
+
+      {/* 1.5 TERMÔMETRO DE NOTA PROJETADA (SOMENTE PARA CMC 2026 OU ESTUDOS COM QUESTÕES) */}
+      {isCmcPlan && (
+        <div className="bento-two">
+          <div className="ds-card ds-card-body">
+            <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>Nota Projetada · Analista TI (100 pts)</div>
+                <div className="text-xs muted">Básicos {readiness.anlBasicosPts}/15 · Gerais {readiness.anlGeraisPts}/15 · Específicos {readiness.anlEspecPts}/70 (peso 1,75)</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: 22, fontWeight: 700 }}>{readiness.anlScore}</span>
+                <span className="text-xs muted"> /100</span>
+              </div>
+            </div>
+            <div className="ds-progress" style={{ height: 8, marginBottom: 8 }}>
+              <div className="ds-progress-fill indigo" style={{ width: `${Math.min(100, readiness.anlScore)}%` }} />
+            </div>
+            <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+              <span className={`ds-badge ${readiness.anlScore >= 75 ? 'ds-badge-green' : readiness.anlScore >= 40 && !readiness.anlZeroArea ? 'ds-badge-amber' : 'ds-badge-neutral'}`}>
+                {readiness.anlScore >= 75 ? 'Competitivo (Top 100)' : readiness.anlScore >= 40 && !readiness.anlZeroArea ? 'Acima do corte (40 pts)' : 'Pratique questões nas 3 áreas'}
+              </span>
+              <button onClick={() => onNavigate('pratica')} className="ds-btn ds-btn-ghost ds-btn-sm">Praticar 200 Questões →</button>
+            </div>
+          </div>
+
+          <div className="ds-card ds-card-body">
+            <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>Nota Projetada · Técnico Leg. (100 pts)</div>
+                <div className="text-xs muted">Básicos {readiness.tecBasicosPts}/15 · Gerais {readiness.tecGeraisPts}/15 · Específicos {readiness.tecEspecPts}/70 (peso 1,75)</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: 22, fontWeight: 700 }}>{readiness.tecScore}</span>
+                <span className="text-xs muted"> /100</span>
+              </div>
+            </div>
+            <div className="ds-progress" style={{ height: 8, marginBottom: 8 }}>
+              <div className="ds-progress-fill blue" style={{ width: `${Math.min(100, readiness.tecScore)}%` }} />
+            </div>
+            <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+              <span className={`ds-badge ${readiness.tecScore >= 75 ? 'ds-badge-green' : readiness.tecScore >= 40 && !readiness.tecZeroArea ? 'ds-badge-amber' : 'ds-badge-neutral'}`}>
+                {readiness.tecScore >= 75 ? 'Competitivo (Top 220)' : readiness.tecScore >= 40 && !readiness.tecZeroArea ? 'Acima do corte (40 pts)' : 'Pratique questões nas 3 áreas'}
+              </span>
+              <button onClick={() => onNavigate('pratica')} className="ds-btn ds-btn-ghost ds-btn-sm">Cartões de Memória →</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2. BENTO PRINCIPAL: PLANO DE HOJE + POMODORO */}
       <div className="bento-main">
@@ -326,11 +438,13 @@ export function TodayDashboard({
           <div className="ds-card-header">
             <div>
               <h2 className="ds-card-title">Seu plano de hoje</h2>
-              <p className="ds-card-desc">Atividades priorizadas para os dois cargos</p>
+              <p className="ds-card-desc">
+                {isCmcPlan ? 'Atividades priorizadas para os dois cargos' : `Atividades organizadas para ${activePlan?.title || 'seu estudo'}`}
+              </p>
             </div>
             <div className="flex-row">
               <button onClick={() => onNavigate('edital')} className="ds-btn ds-btn-ghost ds-btn-sm">
-                <Icons.Plus size={14} /> Escolher no Edital
+                <Icons.Plus size={14} /> Escolher em {syllabusWord}
               </button>
             </div>
           </div>
@@ -345,7 +459,7 @@ export function TodayDashboard({
               <div className="empty-icon"><Icons.Sparkles size={20} /></div>
               <div className="empty-title">Nenhum bloco definido para hoje</div>
               <p className="empty-desc">
-                Peça ao Mentor para montar seu plano diário com base nos pesos do edital e revisões pendentes.
+                Peça ao Mentor para montar seu plano diário com base nas suas prioridades e revisões pendentes.
               </p>
               <button onClick={onAskMentorPlan} className="ds-btn ds-btn-primary">
                 <Icons.Sparkles size={15} /> Gerar meu plano de hoje
@@ -364,20 +478,17 @@ export function TodayDashboard({
                         <span className="activity-subject">{t.subject}</span>
                         <span className={`ds-badge ${priCls}`}>{priTxt}</span>
                         <span className="ds-badge ds-badge-neutral"><Icons.Clock size={12} /> {estMin} min</span>
-                        <span className="ds-badge ds-badge-blue">
-                          {t.status === 'estudando' ? 'Em andamento' : 'Pendente'}
-                        </span>
                       </div>
                       <div className="activity-title">{t.title}</div>
                     </div>
                     <div className="activity-actions">
                       <button onClick={() => onStartFocus(t)} className="ds-btn ds-btn-primary ds-btn-sm">
-                        <Icons.Play size={13} /> Iniciar
+                        <Icons.Play size={13} /> Começar
                       </button>
                       <button
                         onClick={() => onTopicAction({ action: 'complete_study', id: t.id, minutes: estMin })}
                         className="ds-btn ds-btn-secondary ds-btn-sm"
-                        title="Concluir e agendar revisão +1 dia"
+                        title="Concluir e agendar revisão para amanhã"
                       >
                         <Icons.Check size={14} /> Concluir
                       </button>
@@ -393,8 +504,8 @@ export function TodayDashboard({
         <section className="ds-card pomodoro-card">
           <div className="ds-card-header">
             <div>
-              <h2 className="ds-card-title">Timer de Foco</h2>
-              <p className="ds-card-desc">Ciclo Pomodoro conectado ao seu banco</p>
+              <h2 className="ds-card-title">Sessão de foco</h2>
+              <p className="ds-card-desc">Registre seu tempo de estudo com um toque</p>
             </div>
             <div className="preset-group">
               {([15, 25, 50] as const).map(m => (
@@ -449,7 +560,7 @@ export function TodayDashboard({
                   {timerRunning ? <><Icons.Pause size={14} /> Pausar</> : <><Icons.Play size={14} /> Iniciar</>}
                 </button>
                 <button onClick={finishTimerSession} className="ds-btn ds-btn-secondary">
-                  Finalizar e Salvar
+                  Salvar tempo
                 </button>
               </div>
             </div>
@@ -457,22 +568,22 @@ export function TodayDashboard({
         </section>
       </div>
 
-      {/* 3. REVISÕES ESPAÇADAS ADAPTATIVAS (TIMELINE 1 -> 3 -> 7 -> 15d) */}
+      {/* 3. REVISÕES AGENDADAS */}
       <section className="ds-card">
         <div className="ds-card-header">
           <div>
-            <h2 className="ds-card-title">Revisões Espaçadas Adaptativas (1 → 3 → 7 → 15 dias)</h2>
-            <p className="ds-card-desc">Se acertar menos de 60% ou marcar Difícil, o ciclo reinicia em 1 dia</p>
+            <h2 className="ds-card-title">Para revisar</h2>
+            <p className="ds-card-desc">Conteúdos estudados anteriormente que precisam ser reforçados</p>
           </div>
           <div className="ds-segmented">
             <button className={`ds-seg-item ${revFilter === 'hoje' ? 'active' : ''}`} onClick={() => setRevFilter('hoje')}>
-              Hoje / Pendentes ({dueReviews.length})
+              Hoje ({dueReviews.length})
             </button>
             <button className={`ds-seg-item ${revFilter === 'proximas' ? 'active' : ''}`} onClick={() => setRevFilter('proximas')}>
               Próximas ({upcomingReviews.length})
             </button>
             <button className={`ds-seg-item ${revFilter === 'concluidas' ? 'active' : ''}`} onClick={() => setRevFilter('concluidas')}>
-              Concluídas ({completedReviews.length})
+              Dominadas ({completedReviews.length})
             </button>
           </div>
         </div>
@@ -480,10 +591,10 @@ export function TodayDashboard({
         {visibleReviews.length === 0 ? (
           <div className="ds-card-body muted text-sm">
             {revFilter === 'hoje'
-              ? 'Nenhuma revisão pendente para hoje. Conclua um tópico acima para iniciar o ciclo de 1 dia.'
+              ? 'Nenhuma revisão pendente para hoje. Conclua uma atividade acima para agendar a revisão de amanhã.'
               : revFilter === 'proximas'
               ? 'Nenhuma revisão futura agendada ainda.'
-              : 'Nenhum tópico atingiu o ciclo final de domínio (15d) ainda.'}
+              : 'Nenhum conteúdo concluído no ciclo final ainda.'}
           </div>
         ) : (
           <div className="timeline-list">
@@ -494,12 +605,12 @@ export function TodayDashboard({
                 <div key={t.id} className="timeline-row">
                   <div className="timeline-step">
                     <span className={`step-dot ${lowAcc ? 'warn' : revFilter === 'hoje' ? 'warn' : revFilter === 'concluidas' ? 'green' : 'indigo'}`} />
-                    <span className="step-label">{revFilter === 'concluidas' ? 'Dominado' : `${step}d`}</span>
+                    <span className="step-label">{revFilter === 'concluidas' ? 'Dominado' : `+${step}d`}</span>
                   </div>
                   <div className="timeline-content">
                     <div className="text-xs muted">
-                      {t.subject} {t.next_review_date ? `· Agendada ${fmtBR(t.next_review_date)}` : ''}
-                      {lowAcc && <span className="ds-badge ds-badge-red" style={{ marginLeft: 6 }}>Reforço (&lt;60%)</span>}
+                      {t.subject} {t.next_review_date ? `· ${fmtBR(t.next_review_date)}` : ''}
+                      {lowAcc && <span className="ds-badge ds-badge-red" style={{ marginLeft: 6 }}>Reforçar</span>}
                     </div>
                     <div className="text-sm" style={{ fontWeight: 500 }}>{t.title}</div>
                   </div>
@@ -509,12 +620,12 @@ export function TodayDashboard({
                         <button
                           onClick={() => onTopicAction({ action: 'complete_review', id: t.id, grade: 'hard' })}
                           className="ds-btn ds-btn-ghost ds-btn-sm"
-                          title="Difícil: manter revisão para amanhã (+1d)"
+                          title="Rever novamente amanhã"
                         >
-                          Difícil (+1d)
+                          Rever amanhã
                         </button>
                         <button onClick={() => onTopicAction({ action: 'complete_review', id: t.id, grade: 'good' })} className="ds-btn ds-btn-secondary ds-btn-sm">
-                          <Icons.Check size={14} /> Avançar Ciclo
+                          <Icons.Check size={14} /> Revisado
                         </button>
                       </>
                     )}

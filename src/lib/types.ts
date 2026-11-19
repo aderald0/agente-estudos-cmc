@@ -1,5 +1,25 @@
+export interface StudyPlanContextCard {
+  tag: string;
+  title: string;
+  sub: string;
+  pill: string;
+}
+
+export interface StudyPlan {
+  id: string;
+  title: string;
+  subtitle: string;
+  category: 'concurso-duplo' | 'concurso' | 'faculdade' | 'cursinho' | 'livre' | string;
+  syllabus_label: string;
+  has_essay: boolean;
+  target_date: string;
+  daily_hours: string;
+  config_json: string;
+}
+
 export interface Topic {
   id: string;
+  plan_id?: string;
   subject: string;
   title: string;
   overlap: string;
@@ -19,6 +39,7 @@ export interface Topic {
 
 export interface StudyLog {
   id: number;
+  plan_id?: string;
   date: string;
   topic_id: string;
   subject: string;
@@ -29,6 +50,7 @@ export interface StudyLog {
 
 export interface ErrorEntry {
   id: number;
+  plan_id?: string;
   date: string;
   subject: string;
   topic: string;
@@ -38,6 +60,7 @@ export interface ErrorEntry {
 
 export interface EssayEntry {
   id: number;
+  plan_id?: string;
   date: string;
   cargo: string;
   title: string;
@@ -49,12 +72,14 @@ export interface EssayEntry {
 
 export interface ChatMsg {
   id: number;
+  plan_id?: string;
   role: 'user' | 'assistant' | 'tool_trace';
   content: string;
 }
 
 export interface PracticeQuestion {
   id: string;
+  plan_id?: string;
   subject: string;
   qnum: number;
   stem: string;
@@ -66,6 +91,7 @@ export interface PracticeQuestion {
 
 export interface Flashcard {
   id: string;
+  plan_id?: string;
   subject: string;
   front: string;
   back: string;

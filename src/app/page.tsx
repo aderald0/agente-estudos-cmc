@@ -5,20 +5,32 @@ import { EditalView } from '../components/EditalView';
 import { FocusModal } from '../components/FocusModal';
 import { Icons } from '../components/Icons';
 import { MentorView } from '../components/MentorView';
+import { NewStudyView } from '../components/NewStudyView';
 import { NotebookView } from '../components/NotebookView';
 import { PracticeView } from '../components/PracticeView';
 import { TodayDashboard } from '../components/TodayDashboard';
 import { EXAM_DATE, SUBJECT_META } from '../lib/syllabus';
-import { ChatMsg, ErrorEntry, EssayEntry, Flashcard, NavTab, PracticeQuestion, StudyLog, Topic } from '../lib/types';
+import {
+  ChatMsg,
+  ErrorEntry,
+  EssayEntry,
+  Flashcard,
+  NavTab,
+  PracticeQuestion,
+  StudyLog,
+  StudyPlan,
+  Topic,
+} from '../lib/types';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
+const DEFAULT_PLAN_ID = 'cmc-2026';
+
 export default function HomePage() {
   const [tab, setTab] = useState<NavTab>('hoje');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -33,6 +45,12 @@ export default function HomePage() {
   const [authPass, setAuthPass] = useState('');
   const [authError, setAuthError] = useState('');
   const [authSubmitting, setAuthSubmitting] = useState(false);
+
+  // Multi-study plans state
+  const [plans, setPlans] = useState<StudyPlan[]>([]);
+  const [activePlanId, setActivePlanId] = useState<string>(DEFAULT_PLAN_ID);
+  const [activePlan, setActivePlan] = useState<StudyPlan | null>(null);
+  const [showNewStudySetup, setShowNewStudySetup] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState('');
@@ -55,10 +73,13 @@ export default function HomePage() {
   const [ncOverlap, setNcOverlap] = useState('ambos-identico');
   const [ncStudy, setNcStudy] = useState(true);
 
-  const loadState = useCallback(async () => {
+  const loadState = useCallback(async (overridePlanId?: string) => {
+    const targetPlanId = overridePlanId || activePlanId || DEFAULT_PLAN_ID;
     setLoading(true);
     try {
-      const res = await fetch('/api/state', { credentials: 'same-origin' });
+      const res = await fetch(`/api/state?planId=${encodeURIComponent(targetPlanId)}`, {
+        credentials: 'same-origin',
+      });
       if (res.status === 401) {
         setAuthenticated(false);
         setLoading(false);
@@ -70,6 +91,12 @@ export default function HomePage() {
         return;
       }
       setDbError('');
+      setPlans(data.plans || []);
+      if (data.activePlan) {
+        setActivePlan(data.activePlan);
+        setActivePlanId(data.activePlan.id);
+        localStorage.setItem('pierre_active_plan', data.activePlan.id);
+      }
       setTopics(data.topics || []);
       setLogs(data.logs || []);
       setErrors(data.errors || []);
@@ -82,16 +109,18 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activePlanId]);
 
   const checkAuth = useCallback(async () => {
     try {
+      const savedPlan = typeof window !== 'undefined' ? localStorage.getItem('pierre_active_plan') || DEFAULT_PLAN_ID : DEFAULT_PLAN_ID;
+      setActivePlanId(savedPlan);
       const res = await fetch('/api/auth', { credentials: 'same-origin' });
       const data = await res.json();
       setNeedsSetup(Boolean(data.needsSetup));
       setAuthenticated(Boolean(data.authenticated));
       setUsername(data.username || null);
-      if (data.authenticated) await loadState();
+      if (data.authenticated) await loadState(savedPlan);
       else setLoading(false);
     } catch {
       setDbError('Não foi possível verificar autenticação.');
@@ -159,6 +188,7 @@ export default function HomePage() {
     e.preventDefault();
     setAuthError('');
     setAuthSubmitting(true);
+    const wasFirstSetup = needsSetup;
     try {
       const res = await fetch('/api/auth', {
         method: 'POST',
@@ -175,7 +205,11 @@ export default function HomePage() {
       setNeedsSetup(false);
       setAuthenticated(true);
       setUsername(data.username);
-      await loadState();
+      await loadState(activePlanId);
+      // On very first registration, open the conversational study setup screen right away
+      if (wasFirstSetup) {
+        setShowNewStudySetup(true);
+      }
     } catch {
       setAuthError('Erro de rede.');
     } finally {
@@ -194,14 +228,38 @@ export default function HomePage() {
     setUsername(null);
   }
 
+  async function handleSwitchPlan(newPlanId: string) {
+    if (newPlanId === '__new__') {
+      setShowNewStudySetup(true);
+      return;
+    }
+    setShowNewStudySetup(false);
+    setActivePlanId(newPlanId);
+    localStorage.setItem('pierre_active_plan', newPlanId);
+    await loadState(newPlanId);
+  }
+
+  async function handleDeleteCurrentPlan() {
+    if (!activePlan || activePlan.id === DEFAULT_PLAN_ID) return;
+    if (!window.confirm(`Deseja remover o estudo "${activePlan.title}"?`)) return;
+    await fetch('/api/plans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ action: 'delete', plan_id: activePlan.id }),
+    });
+    setActivePlanId(DEFAULT_PLAN_ID);
+    await loadState(DEFAULT_PLAN_ID);
+  }
+
   async function topicAction(payload: Record<string, unknown>) {
     await fetch('/api/topics', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, plan_id: activePlanId }),
     });
-    await loadState();
+    await loadState(activePlanId);
   }
 
   async function practiceAction(payload: Record<string, unknown>) {
@@ -209,30 +267,43 @@ export default function HomePage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, plan_id: activePlanId }),
     });
-    await loadState();
+    await loadState(activePlanId);
   }
 
-  async function sendMessage(overrideText?: string) {
+  async function sendMessage(
+    overrideText?: string,
+    fileObj?: { name: string; base64: string; mimeType: string }
+  ) {
     const text = (overrideText ?? chatInput).trim();
-    if (!text || chatBusy) return;
+    if ((!text && !fileObj) || chatBusy) return;
     if (!overrideText) setChatInput('');
 
-    setChat(prev => [...prev, { id: Date.now(), role: 'user', content: text }]);
+    const userDisplay = fileObj
+      ? `${text ? text + '\n' : ''}[Arquivo anexado: ${fileObj.name}]`
+      : text;
+
+    setChat(prev => [...prev, { id: Date.now(), role: 'user', content: userDisplay }]);
     setChatBusy(true);
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({
+          plan_id: activePlanId,
+          message: text,
+          fileBase64: fileObj?.base64 || '',
+          fileName: fileObj?.name || '',
+          mimeType: fileObj?.mimeType || '',
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
         setChat(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: `**Erro:** ${data.error || 'Falha na API'}` }]);
       } else {
-        await loadState();
+        await loadState(activePlanId);
       }
     } catch (e) {
       setChat(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: `**Erro de rede:** ${e instanceof Error ? e.message : 'Erro'}` }]);
@@ -241,10 +312,13 @@ export default function HomePage() {
     }
   }
 
-  const daysLeft = useMemo(
-    () => Math.max(0, Math.ceil((new Date(`${EXAM_DATE}T08:00:00`).getTime() - Date.now()) / 86400000)),
-    []
-  );
+  const targetDateStr = activePlan?.target_date || EXAM_DATE;
+  const daysLeft = useMemo(() => {
+    if (!targetDateStr) return null;
+    const ms = new Date(`${targetDateStr}T08:00:00`).getTime() - Date.now();
+    if (Number.isNaN(ms)) return null;
+    return Math.max(0, Math.ceil(ms / 86400000));
+  }, [targetDateStr]);
 
   const overallPct = useMemo(() => {
     if (!topics.length) return 0;
@@ -252,13 +326,7 @@ export default function HomePage() {
     return Math.round((done / topics.length) * 100);
   }, [topics]);
 
-  const tabTitles: Record<NavTab, string> = {
-    hoje: 'Painel de Estudos · Hoje',
-    pratica: 'Prática Ativa · 200 Questões Selecon & Flashcards',
-    mentor: 'Mentor Inteligente',
-    edital: 'Edital Verticalizado (Sumário das Apostilas)',
-    caderno: 'Caderno de Erros, Discursiva & NotebookLM',
-  };
+  const syllabusTabLabel = activePlan?.syllabus_label || 'Edital';
 
   if (!authChecked) {
     return (
@@ -278,10 +346,10 @@ export default function HomePage() {
         <form onSubmit={handleAuthSubmit} className="auth-panel space-y">
           <div className="flex-row" style={{ justifyContent: 'space-between' }}>
             <div className="flex-row" style={{ gap: 10 }}>
-              <span className="brand-icon"><Icons.Lock /></span>
+              <span className="brand-icon"><Icons.Logo size={17} /></span>
               <div>
-                <h1 style={{ fontSize: 17 }}>{needsSetup ? 'Configuração Inicial' : 'Estudos CMC 2026'}</h1>
-                <div className="text-xs muted">Analista TI &amp; Técnico Legislativo</div>
+                <h1 style={{ fontSize: 17 }}>{needsSetup ? 'Criar sua conta' : 'Pierre · Estudos'}</h1>
+                <div className="text-xs muted">Organização inteligente de estudos</div>
               </div>
             </div>
             <button type="button" onClick={toggleTheme} className="ds-icon-btn" aria-label="Alternar tema"><Icons.SunMoon /></button>
@@ -289,8 +357,8 @@ export default function HomePage() {
 
           <p className="text-xs muted" style={{ margin: 0 }}>
             {needsSetup
-              ? 'Crie seu usuário e senha pessoais. Após o cadastro inicial, novos registros públicos ficam bloqueados.'
-              : 'Entre com suas credenciais para acessar seu painel, revisões e mentor.'}
+              ? 'Crie seu usuário e senha. Em seguida, você poderá anexar seu edital, ementa da faculdade ou apostila para montar sua programação.'
+              : 'Entre com suas credenciais para acessar seus estudos, questões e revisões.'}
           </p>
 
           <div>
@@ -306,7 +374,7 @@ export default function HomePage() {
           {authError && <div className="inline-alert error">{authError}</div>}
 
           <button type="submit" disabled={authSubmitting} className="ds-btn ds-btn-primary" style={{ width: '100%' }}>
-            {authSubmitting ? 'Autenticando...' : (needsSetup ? 'Criar Conta e Entrar' : 'Entrar no Painel')}
+            {authSubmitting ? 'Autenticando...' : (needsSetup ? 'Continuar' : 'Entrar')}
           </button>
 
           {!isInstalledPwa && (
@@ -324,19 +392,78 @@ export default function HomePage() {
     );
   }
 
+  // STAGE 2: CONVERSATIONAL NEW STUDY SETUP (ONBOARDING OR "+ NOVO ESTUDO")
+  if (showNewStudySetup) {
+    return (
+      <div className="pierre-shell">
+        <main className="saas-content">
+          <NewStudyView
+            username={username}
+            hasExistingPlans={plans.length > 0}
+            onCancel={() => setShowNewStudySetup(false)}
+            onPlanCreated={async newPlanId => {
+              setShowNewStudySetup(false);
+              setActivePlanId(newPlanId);
+              localStorage.setItem('pierre_active_plan', newPlanId);
+              setTab('hoje');
+              await loadState(newPlanId);
+            }}
+          />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="pierre-shell">
-      {/* PIERRE FLOATING GLASS HEADER & CENTERED PILL SWITCHER */}
+      {/* PIERRE FLOATING GLASS HEADER & STUDY SWITCHER */}
       <div className="pierre-topbar-wrap">
         <header className="pierre-topbar">
           <div className="brand-id">
             <div className="brand-icon"><Icons.Logo size={17} /></div>
-            <div>
-              <div className="brand-name">Pierre · CMC 26</div>
-              <div className="brand-tag">
-                <span className="pierre-live-dot" />
-                <span>{daysLeft}d até 20/12 · {overallPct}%</span>
-              </div>
+            <div className="flex-row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+              <select
+                aria-label="Selecionar estudo ativo"
+                value={activePlanId}
+                onChange={e => handleSwitchPlan(e.target.value)}
+                className="ds-select"
+                style={{
+                  height: 34,
+                  padding: '0 26px 0 12px',
+                  borderRadius: 9999,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  background: 'var(--c-surface-2)',
+                  border: '1px solid var(--c-border)',
+                  maxWidth: 220,
+                }}
+              >
+                {plans.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+                <option value="__new__">+ Novo estudo...</option>
+              </select>
+
+              <button
+                onClick={() => setShowNewStudySetup(true)}
+                className="ds-btn ds-btn-secondary ds-btn-sm hide-mobile"
+                title="Configurar novo estudo com PDF ou conversa"
+              >
+                <Icons.Plus size={13} /> <span>Novo estudo</span>
+              </button>
+
+              {activePlan && activePlan.id !== DEFAULT_PLAN_ID && (
+                <button
+                  onClick={handleDeleteCurrentPlan}
+                  className="ds-icon-btn hide-mobile"
+                  title="Remover este estudo"
+                  aria-label="Remover estudo"
+                >
+                  <Icons.Trash size={14} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -351,7 +478,7 @@ export default function HomePage() {
               <Icons.Sparkles size={15} /> <span>Mentor</span>
             </button>
             <button className={`pierre-nav-pill ${tab === 'edital' ? 'active' : ''}`} onClick={() => setTab('edital')}>
-              <Icons.BookOpen size={15} /> <span>Edital</span>
+              <Icons.BookOpen size={15} /> <span>{syllabusTabLabel}</span>
             </button>
             <button className={`pierre-nav-pill ${tab === 'caderno' ? 'active' : ''}`} onClick={() => setTab('caderno')}>
               <Icons.FileText size={15} /> <span>Caderno</span>
@@ -359,6 +486,9 @@ export default function HomePage() {
           </nav>
 
           <div className="topbar-right">
+            <span className="ds-badge ds-badge-neutral hide-mobile">
+              {daysLeft !== null ? `${daysLeft}d · ` : ''}{overallPct}%
+            </span>
             {!isInstalledPwa && (
               <button
                 onClick={handleInstallClick}
@@ -383,13 +513,14 @@ export default function HomePage() {
         {dbError && (
           <div className="inline-alert error" style={{ maxWidth: 1112, margin: '8px auto 0', width: 'calc(100% - 48px)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{dbError}</span>
-            <button onClick={loadState} className="ds-btn ds-btn-secondary ds-btn-sm">Recarregar</button>
+            <button onClick={() => loadState(activePlanId)} className="ds-btn ds-btn-secondary ds-btn-sm">Recarregar</button>
           </div>
         )}
 
-        <main className="saas-content">
+        <main className={`saas-content ${tab === 'mentor' ? 'is-mentor-tab' : ''}`}>
           {tab === 'hoje' && (
             <TodayDashboard
+              activePlan={activePlan}
               topics={topics}
               questions={questions}
               loading={loading}
@@ -405,6 +536,7 @@ export default function HomePage() {
 
           {tab === 'pratica' && (
             <PracticeView
+              activePlan={activePlan}
               questions={questions}
               flashcards={flashcards}
               onPracticeAction={practiceAction}
@@ -415,7 +547,7 @@ export default function HomePage() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'same-origin',
-                    body: JSON.stringify(autoError),
+                    body: JSON.stringify({ ...autoError, plan_id: activePlanId }),
                   });
                 }
                 await sendMessage(promptText);
@@ -425,6 +557,7 @@ export default function HomePage() {
 
           {tab === 'mentor' && (
             <MentorView
+              activePlan={activePlan}
               chat={chat}
               topics={topics}
               chatInput={chatInput}
@@ -432,8 +565,11 @@ export default function HomePage() {
               onChangeInput={setChatInput}
               onSend={sendMessage}
               onClear={async () => {
-                await fetch('/api/chat', { method: 'DELETE', credentials: 'same-origin' });
-                await loadState();
+                await fetch(`/api/chat?planId=${encodeURIComponent(activePlanId)}`, {
+                  method: 'DELETE',
+                  credentials: 'same-origin',
+                });
+                await loadState(activePlanId);
               }}
               onStartFocus={t => setFocusTopic(t)}
             />
@@ -441,31 +577,51 @@ export default function HomePage() {
 
           {tab === 'edital' && (
             <EditalView
+              activePlan={activePlan}
               topics={topics}
               onStartFocus={t => setFocusTopic(t)}
               onEditTopic={t => setEditTopic({ ...t })}
-              onCreateCustom={() => setShowCustomModal(true)}
+              onCreateCustom={() => {
+                if (topics[0]?.subject) setNcSubject(topics[0].subject);
+                setShowCustomModal(true);
+              }}
               onTopicAction={topicAction}
             />
           )}
 
           {tab === 'caderno' && (
             <NotebookView
+              activePlan={activePlan}
               topics={topics}
               errors={errors}
               essays={essays}
               logs={logs}
               onAddError={async payload => {
-                await fetch('/api/errors', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(payload) });
-                await loadState();
+                await fetch('/api/errors', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'same-origin',
+                  body: JSON.stringify({ ...payload, plan_id: activePlanId }),
+                });
+                await loadState(activePlanId);
               }}
               onDeleteError={async id => {
-                await fetch('/api/errors', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ id }) });
-                await loadState();
+                await fetch('/api/errors', {
+                  method: 'DELETE',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'same-origin',
+                  body: JSON.stringify({ id }),
+                });
+                await loadState(activePlanId);
               }}
               onSaveEssay={async payload => {
-                await fetch('/api/essays', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(payload) });
-                await loadState();
+                await fetch('/api/essays', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'same-origin',
+                  body: JSON.stringify({ ...payload, plan_id: activePlanId }),
+                });
+                await loadState(activePlanId);
               }}
               onCorrectEssayWithMentor={promptText => {
                 setTab('mentor');
@@ -487,7 +643,7 @@ export default function HomePage() {
             <Icons.Sparkles size={19} /> <span>Mentor</span>
           </button>
           <button className={`mob-nav-btn ${tab === 'edital' ? 'active' : ''}`} onClick={() => setTab('edital')}>
-            <Icons.BookOpen size={19} /> <span>Edital</span>
+            <Icons.BookOpen size={19} /> <span>{syllabusTabLabel}</span>
           </button>
           <button className={`mob-nav-btn ${tab === 'caderno' ? 'active' : ''}`} onClick={() => setTab('caderno')}>
             <Icons.FileText size={19} /> <span>Caderno</span>
@@ -503,7 +659,7 @@ export default function HomePage() {
           setFocusTopic(null);
           setTab('mentor');
           sendMessage(
-            `Valide meu resumo Feynman sobre o capítulo "${t.title}" (${t.subject}): "${notes || 'Sem anotações escritas — me faça 1 pergunta-chave para testar se compreendi.'}"`
+            `Valide minha explicação sobre "${t.title}" (${t.subject}): "${notes || 'Sem anotações escritas — me faça 1 pergunta-chave para testar se compreendi.'}"`
           );
         }}
         onSave={async ({ id, minutes, q_right, q_total, mastery, notes, complete }) => {
@@ -552,7 +708,7 @@ export default function HomePage() {
             </div>
             <div className="ds-modal-body space-y">
               <div className="flex-row" style={{ gap: 18 }}>
-                <label className="flex-row text-sm"><input type="checkbox" checked={editTopic.study_queue} onChange={e => setEditTopic({ ...editTopic, study_queue: e.target.checked })} /> Na fila de hoje</label>
+                <label className="flex-row text-sm"><input type="checkbox" checked={editTopic.study_queue} onChange={e => setEditTopic({ ...editTopic, study_queue: e.target.checked })} /> No plano de hoje</label>
                 <label className="flex-row text-sm"><input type="checkbox" checked={editTopic.review_queue} onChange={e => setEditTopic({ ...editTopic, review_queue: e.target.checked })} /> Em revisão</label>
               </div>
               <div className="grid-3">
@@ -589,28 +745,34 @@ export default function HomePage() {
         <div className="ds-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setShowCustomModal(false); }}>
           <div className="ds-modal" style={{ maxWidth: 420 }} role="dialog" aria-modal="true" aria-label="Novo tópico">
             <div className="ds-modal-header">
-              <h2 className="ds-modal-title">Novo Tópico Personalizado</h2>
+              <h2 className="ds-modal-title">Novo Tópico</h2>
               <button onClick={() => setShowCustomModal(false)} className="ds-icon-btn" aria-label="Fechar"><Icons.Close /></button>
             </div>
             <div className="ds-modal-body space-y">
               <div>
-                <label className="field-label">Disciplina</label>
-                <select className="ds-select" value={ncSubject} onChange={e => setNcSubject(e.target.value)}>
-                  {SUBJECT_META.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
-                </select>
+                <label className="field-label">Matéria / Unidade</label>
+                <input
+                  className="ds-input"
+                  type="text"
+                  value={ncSubject}
+                  onChange={e => setNcSubject(e.target.value)}
+                  placeholder="Ex: Unidade 1 / Direito Administrativo"
+                />
               </div>
               <div>
                 <label className="field-label">Título do Conteúdo</label>
-                <input className="ds-input" type="text" value={ncTitle} onChange={e => setNcTitle(e.target.value)} placeholder="Ex: Simulado Selecon Completo" />
+                <input className="ds-input" type="text" value={ncTitle} onChange={e => setNcTitle(e.target.value)} placeholder="Ex: Lista de Exercícios 01" />
               </div>
-              <div>
-                <label className="field-label">Abrangência</label>
-                <select className="ds-select" value={ncOverlap} onChange={e => setNcOverlap(e.target.value)}>
-                  <option value="ambos-identico">Comum aos 2 Cargos</option>
-                  <option value="exclusivo-analista">Exclusivo Analista TI</option>
-                  <option value="exclusivo-tecnico">Exclusivo Técnico</option>
-                </select>
-              </div>
+              {(!activePlan || activePlan.id === DEFAULT_PLAN_ID) && (
+                <div>
+                  <label className="field-label">Abrangência</label>
+                  <select className="ds-select" value={ncOverlap} onChange={e => setNcOverlap(e.target.value)}>
+                    <option value="ambos-identico">Comum aos 2 Cargos</option>
+                    <option value="exclusivo-analista">Exclusivo Analista TI</option>
+                    <option value="exclusivo-tecnico">Exclusivo Técnico</option>
+                  </select>
+                </div>
+              )}
               <label className="flex-row text-sm"><input type="checkbox" checked={ncStudy} onChange={e => setNcStudy(e.target.checked)} /> Adicionar ao plano de hoje</label>
             </div>
             <div className="ds-modal-footer">
@@ -618,7 +780,7 @@ export default function HomePage() {
               <button
                 onClick={async () => {
                   if (!ncTitle.trim()) return;
-                  await topicAction({ action: 'create', subject: ncSubject, title: ncTitle.trim(), overlap: ncOverlap, setForToday: ncStudy });
+                  await topicAction({ action: 'create', subject: ncSubject.trim() || 'Geral', title: ncTitle.trim(), overlap: ncOverlap, setForToday: ncStudy });
                   setNcTitle('');
                   setShowCustomModal(false);
                 }}
@@ -639,13 +801,13 @@ export default function HomePage() {
               <div className="flex-row" style={{ gap: 12 }}>
                 <img
                   src="/icon-192.png"
-                  alt="Logo Pierre CMC 26"
+                  alt="Logo Pierre"
                   width={42}
                   height={42}
                   style={{ borderRadius: 11, flexShrink: 0, boxShadow: 'var(--sh-sm)' }}
                 />
                 <div>
-                  <h2 className="ds-modal-title">Instalar Pierre · CMC 26</h2>
+                  <h2 className="ds-modal-title">Instalar Pierre no Celular</h2>
                   <div className="text-xs muted">Ícone oficial na tela inicial e abertura em tela cheia</div>
                 </div>
               </div>
@@ -660,7 +822,7 @@ export default function HomePage() {
                 <ol className="text-xs muted" style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 6 }}>
                   <li>Toque no menu de <strong>3 pontos (⋮)</strong> no canto superior direito do navegador.</li>
                   <li>Selecione <strong>&ldquo;Instalar aplicativo&rdquo;</strong> ou <strong>&ldquo;Adicionar à tela inicial&rdquo;</strong>.</li>
-                  <li>Confirme em <strong>Instalar</strong>. A nova logo <strong>Pierre · CMC 26</strong> aparecerá na sua tela inicial!</li>
+                  <li>Confirme em <strong>Instalar</strong>. A logo oficial aparecerá na sua tela inicial!</li>
                 </ol>
               </div>
 
