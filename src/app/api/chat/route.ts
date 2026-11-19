@@ -327,8 +327,8 @@ ${JSON.stringify(snapshot)}`;
       parts: [{ text: m.content }],
     }));
 
-    const model = process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const primaryModel = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
+    const candidateModels = Array.from(new Set([primaryModel, 'gemini-3.8-flash', 'gemini-flash-latest']));
 
     const traces: string[] = [];
     let finalReply = '';
@@ -336,20 +336,28 @@ ${JSON.stringify(snapshot)}`;
 
     while (steps < 5) {
       steps++;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: history,
-          tools: AGENT_TOOLS,
-          generationConfig: { temperature: 0.5 },
-        }),
-      });
+      let res: Response | null = null;
+      let errTxt = '';
 
-      if (!res.ok) {
-        const errTxt = await res.text();
-        throw new Error(`Gemini API HTTP ${res.status}: ${errTxt.slice(0, 260)}`);
+      for (const m of candidateModels) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: history,
+            tools: AGENT_TOOLS,
+            generationConfig: { temperature: 0.5 },
+          }),
+        });
+        if (res.ok) break;
+        errTxt = await res.text();
+        if (res.status !== 404) break;
+      }
+
+      if (!res || !res.ok) {
+        throw new Error(`Gemini API HTTP ${res?.status || 500}: ${errTxt.slice(0, 260)}`);
       }
 
       const data = await res.json();
