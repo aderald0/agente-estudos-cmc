@@ -435,9 +435,17 @@ export default function HomePage() {
               questions={questions}
               flashcards={flashcards}
               onPracticeAction={practiceAction}
-              onExplainWithMentor={promptText => {
+              onExplainWithMentor={async (promptText, autoError) => {
                 setTab('mentor');
-                sendMessage(promptText);
+                if (autoError) {
+                  await fetch('/api/errors', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(autoError),
+                  });
+                }
+                await sendMessage(promptText);
               }}
             />
           )}

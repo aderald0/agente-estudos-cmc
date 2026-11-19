@@ -392,6 +392,7 @@ ${JSON.stringify(snapshot)}`;
     const candidateModels = Array.from(new Set([primaryModel, 'gemini-3.8-flash', 'gemini-flash-latest']));
 
     const traces: string[] = [];
+    const collectedTexts: string[] = [];
     let finalReply = '';
     let steps = 0;
 
@@ -409,7 +410,7 @@ ${JSON.stringify(snapshot)}`;
             system_instruction: { parts: [{ text: systemPrompt }] },
             contents: history,
             tools: AGENT_TOOLS,
-            generationConfig: { temperature: 0.4, maxOutputTokens: 450 },
+            generationConfig: { temperature: 0.35, maxOutputTokens: 2048 },
           }),
         });
         if (res.ok) break;
@@ -424,7 +425,15 @@ ${JSON.stringify(snapshot)}`;
       const data = await res.json();
       const parts = data.candidates?.[0]?.content?.parts || [];
       const fnCalls = parts.filter((p: Record<string, unknown>) => p.functionCall);
-      const textParts = parts.filter((p: Record<string, unknown>) => p.text).map((p: Record<string, unknown>) => String(p.text)).join('\n');
+      const textParts = parts
+        .filter((p: Record<string, unknown>) => typeof p.text === 'string' && !p.thought)
+        .map((p: Record<string, unknown>) => String(p.text).trim())
+        .filter(Boolean)
+        .join('\n');
+
+      if (textParts) {
+        collectedTexts.push(textParts);
+      }
 
       if (fnCalls.length > 0) {
         history.push({ role: 'model', parts });
@@ -439,9 +448,13 @@ ${JSON.stringify(snapshot)}`;
         }
         history.push({ role: 'user', parts: fnResponses });
       } else {
-        finalReply = textParts || 'Concluído.';
+        finalReply = collectedTexts.join('\n\n') || (traces.length > 0 ? `Registrado no banco: ${traces.join(' · ')}.` : 'Não foi possível gerar a explicação neste momento. Tente novamente.');
         break;
       }
+    }
+
+    if (!finalReply) {
+      finalReply = collectedTexts.join('\n\n') || (traces.length > 0 ? `Registrado no banco: ${traces.join(' · ')}.` : 'Concluído.');
     }
 
     if (traces.length > 0) {

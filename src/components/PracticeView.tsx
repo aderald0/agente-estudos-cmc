@@ -9,7 +9,10 @@ interface PracticeViewProps {
   questions: PracticeQuestion[];
   flashcards: Flashcard[];
   onPracticeAction: (payload: Record<string, unknown>) => Promise<void>;
-  onExplainWithMentor: (promptText: string) => void;
+  onExplainWithMentor: (
+    promptText: string,
+    autoError?: { subject: string; topic: string; mistake: string; correction: string }
+  ) => void;
 }
 
 export function PracticeView({
@@ -188,14 +191,30 @@ export function PracticeView({
                       {answered && (
                         <div className="flex-row" style={{ justifyContent: 'flex-end', paddingTop: 4 }}>
                           <button
-                            onClick={() =>
+                            onClick={() => {
+                              const chosenOpt = opts.find(o => o.letter === q.user_choice);
+                              const rightOpt = opts.find(o => o.letter === q.answer);
+                              const chosenDesc = chosenOpt ? `(${chosenOpt.letter}) ${chosenOpt.text}` : `(${q.user_choice})`;
+                              const rightDesc = rightOpt ? `(${rightOpt.letter}) ${rightOpt.text}` : `(${q.answer})`;
+
+                              const autoError =
+                                q.is_correct === false
+                                  ? {
+                                      subject: q.subject,
+                                      topic: `Questão #${q.qnum} · ${q.stem.slice(0, 90)}...`,
+                                      mistake: `Marquei ${chosenDesc}`,
+                                      correction: `Gabarito oficial: ${rightDesc}`,
+                                    }
+                                  : undefined;
+
                               onExplainWithMentor(
-                                `Comente de forma direta a Questão #${q.qnum} de ${q.subject}: "${q.stem.slice(0, 260)}..." na qual marquei (${q.user_choice}) e o gabarito oficial é (${q.answer}). Se eu errei, registre a regra no meu Caderno de Erros.`
-                              )
-                            }
+                                `Explique de forma direta e objetiva a Questão #${q.qnum} de ${q.subject}:\nEnunciado: "${q.stem}"\nAlternativa que marquei: ${chosenDesc}\nGabarito oficial: ${rightDesc}\nExplique por que o gabarito oficial está correto e qual a pegadinha da alternativa marcada.`,
+                                autoError
+                              );
+                            }}
                             className="ds-btn ds-btn-secondary ds-btn-sm"
                           >
-                            <Icons.Sparkles size={13} /> Explicar com Mentor {q.is_correct === false ? '& Salvar Erro' : ''}
+                            <Icons.Sparkles size={13} /> Explicar com Mentor {q.is_correct === false ? '& Salvar no Caderno' : ''}
                           </button>
                         </div>
                       )}
