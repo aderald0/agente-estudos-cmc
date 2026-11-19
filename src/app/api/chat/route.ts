@@ -306,6 +306,26 @@ async function executeDbTool(planId: string, name: string, args: Record<string, 
     return { result: { ok: true, total: sc + sf }, trace: `Avaliação salva: ${sc + sf}/100 pts` };
   }
 
+  if (name === 'bulk_add_topics') {
+    const list = Array.isArray(args.topics) ? (args.topics as Array<Record<string, unknown>>) : [];
+    let added = 0;
+    const baseTs = Date.now();
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i];
+      const subject = String(item.subject || 'Geral').slice(0, 120);
+      const title = String(item.title || '').trim().slice(0, 220);
+      if (!title) continue;
+      const pri = item.priority === 'alta' || item.priority === 'media' || item.priority === 'baixa' ? String(item.priority) : 'alta';
+      const id = `${planId}-bulk-${baseTs}-${i + 1}`;
+      await sql`
+        INSERT INTO topics (id, plan_id, subject, title, overlap, priority, status, study_queue, study_date, sort_order)
+        VALUES (${id}, ${planId}, ${subject}, ${title}, 'ambos-identico', ${pri}, 'nao-iniciado', false, '', ${500 + i})
+      `;
+      added++;
+    }
+    return { result: { ok: true, added }, trace: `${added} tópicos adicionados à grade` };
+  }
+
   return { result: { ok: false, error: 'Ferramenta desconhecida' }, trace: '' };
 }
 
@@ -396,7 +416,7 @@ REGRAS DE INTERAÇÃO (OBRIGATÓRIO):
 1. Seja natural, humano, direto ao ponto e conciso (máximo 120 palavras por resposta, exceto quando corrigir redação/discursiva ou explicar questão).
 2. PROIBIDO usar tabelas markdown ("| ... |"), PROIBIDO usar emojis, PROIBIDO usar jargões técnicos robóticos ("SRS", "NLM", "Adaptação Orgânica"). Use apenas texto limpo e listas simples ("- ").
 3. Quando o usuário perguntar o que estudar hoje ou informar tempo disponível, cheque revisões pendentes (rd <= today) e tópicos prioritários, USE set_study_queue para atualizar a fila e responda em até 3 itens curtos.
-4. Sempre que o usuário relatar o que estudou, acertos, revisão feita, erro cometido ou anexar um PDF com novos conteúdos, USE IMEDIATAMENTE as ferramentas do banco (log_study_session, mark_review_done, schedule_review, add_error_entry, create_custom_topic, create_flashcard) e confirme de forma simples.
+4. Sempre que o usuário relatar o que estudou, acertos, revisão feita, erro cometido ou anexar um PDF/pedir para adicionar disciplinas faltantes, USE IMEDIATAMENTE as ferramentas do banco (log_study_session, mark_review_done, schedule_review, add_error_entry, create_custom_topic, bulk_add_topics, create_flashcard) e confirme de forma simples. Quando precisar adicionar vários tópicos ou disciplinas do edital, use bulk_add_topics para inserir todos de uma só vez.
 5. Use apenas topic_ids existentes no JSON abaixo ao atualizar tópicos existentes.
 
 ESTADO ATUAL DO ESTUDO (JSON):
@@ -409,7 +429,7 @@ ${JSON.stringify(snapshot)}`;
           role: 'user',
           parts: [
             { inlineData: { mimeType, data: fileBase64 } },
-            { text: userText || `Analise o documento anexado (${fileName}) e extraia os tópicos ou responda ao meu pedido.` },
+            { text: userText || `Analise o documento anexado (${fileName}) e extraia todos os tópicos e disciplinas faltantes usando bulk_add_topics.` },
           ],
         };
       }
@@ -441,7 +461,7 @@ ${JSON.stringify(snapshot)}`;
             system_instruction: { parts: [{ text: systemPrompt }] },
             contents: history,
             tools: AGENT_TOOLS,
-            generationConfig: { temperature: 0.35, maxOutputTokens: 2048 },
+            generationConfig: { temperature: 0.35, maxOutputTokens: 8192 },
           }),
         });
         if (res.ok) break;

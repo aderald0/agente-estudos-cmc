@@ -87,12 +87,25 @@ export async function POST(req: Request) {
         )
       `;
 
-      // Insert topics and pre-populate the first 3 into Today's Study Queue so the user immediately has a daily schedule
+      // Pick up to 3 high-priority topics across different subjects for Today's initial schedule
+      const initialTodayIndices = new Set<number>();
+      const seenSubjects = new Set<string>();
+      for (let i = 0; i < draft.topics.length && initialTodayIndices.size < 3; i++) {
+        const sub = String(draft.topics[i].subject || '');
+        if (!seenSubjects.has(sub)) {
+          seenSubjects.add(sub);
+          initialTodayIndices.add(i);
+        }
+      }
+      for (let i = 0; i < draft.topics.length && initialTodayIndices.size < 3; i++) {
+        initialTodayIndices.add(i);
+      }
+
       for (let i = 0; i < draft.topics.length; i++) {
         const t = draft.topics[i];
         const tid = `${planId}-t-${i + 1}`;
-        const inTodayQueue = i < 3;
-        const pri = t.priority === 'alta' || t.priority === 'media' || t.priority === 'baixa' ? t.priority : (i < 3 ? 'alta' : 'media');
+        const inTodayQueue = initialTodayIndices.has(i);
+        const pri = t.priority === 'alta' || t.priority === 'media' || t.priority === 'baixa' ? t.priority : (inTodayQueue ? 'alta' : 'media');
         await sql`
           INSERT INTO topics (id, plan_id, subject, title, overlap, priority, status, study_queue, study_date, sort_order)
           VALUES (
@@ -157,13 +170,12 @@ export async function POST(req: Request) {
         `;
       }
 
-      // Seed initial welcome assistant message in the new study plan's Mentor chat
       await sql`
         INSERT INTO chat_messages (plan_id, role, content)
         VALUES (
           ${planId},
           'assistant',
-          ${`Plano de ${p.title} criado! Já organizei seus primeiros blocos na tela Hoje. Quando quiser reorganizar o dia, tirar dúvidas ou gerar novas questões, é só falar comigo.`}
+          ${`Plano de ${p.title} criado com ${draft.topics.length} tópicos em ${seenSubjects.size} disciplinas! Já separei seus primeiros blocos na tela Hoje.`}
         )
       `;
 
@@ -181,46 +193,56 @@ export async function POST(req: Request) {
     const fileName = typeof body.fileName === 'string' ? body.fileName : '';
     const mimeType = typeof body.mimeType === 'string' ? body.mimeType : 'application/pdf';
 
-    const systemInstruction = `Você é o assistente de configuração inicial de estudos do aplicativo Pierre.
-Sua função é conversar de forma natural, humana e sem jargões técnicos para entender o que o usuário quer estudar (ou ler o documento PDF/texto anexado por ele) e montar um plano de estudos orgânico e realista.
+    const systemInstruction = `Você é o assistente especialista em análise de editais, ementas universitárias e materiais de estudo do aplicativo Pierre.
 
-REGRAS OBRIGATÓRIAS:
-1. Se o usuário anexou um arquivo (PDF de edital, plano de ensino/ementa de faculdade, apostila de cursinho ou slides) OU já informou o tema/objetivo que deseja estudar (ex: "Cálculo II na faculdade", "Concurso Polícia Federal", "Certificação AWS", "Inglês"), defina "ready": true e preencha IMEDIATAMENTE toda a estrutura do estudo ("plan", "topics", "questions", "flashcards") para que o aluno já veja a programação pronta sem burocracia!
-2. Só defina "ready": false se a mensagem do usuário for apenas um cumprimento vago (ex: "oi", "olá") sem nenhum tema e sem arquivo anexado. Nesse caso, pergunte de forma simples o que ele vai estudar ou peça para anexar o PDF.
-3. Adapte o estudo organicamente à realidade de cada caso:
-   - Matéria de faculdade: category = "faculdade", syllabus_label = "Ementa", has_essay = false (faculdade não tem redação de banca 20-30 linhas!). Nos context_cards, destaque P1, P2, Trabalhos/Listas e Média.
-   - Concurso público SEM discursiva: category = "concurso", syllabus_label = "Edital", has_essay = false.
-   - Concurso público COM discursiva/redação explícita: category = "concurso", syllabus_label = "Edital", has_essay = true.
-   - Cursinho / Certificação / Estudo livre: category = "cursinho" (ou "livre"), syllabus_label = "Módulos", has_essay = false (exceto ENEM/vestibular com redação).
-4. Extraia entre 6 e 16 tópicos reais e bem organizados em "topics" (agrupados por disciplina/unidade em "subject"), crie 4 a 6 questões práticas de múltipla escolha (A, B, C, D) sobre o conteúdo real em "questions", e 4 a 6 cartões de memória em "flashcards".
-5. Em "reply", escreva uma mensagem curta, natural e acolhedora dizendo o que você identificou e que os primeiros blocos de hoje já estão separados, perguntando apenas se ele quer ajustar a carga horária diária ou abrir o painel agora.
+ATENÇÃO MÁXIMA PARA EDITAIS LONGOS (ex: 50 a 150 páginas, como SEMA, Tribunais, Polícia, Prefeituras):
+1. Quando o usuário enviar um PDF de Edital de Concurso Público:
+   - Navegue até o **Quadro de Provas / Disciplinas** e até o **Anexo de Conteúdo Programático** (que geralmente fica nas páginas finais do PDF).
+   - Se o edital tiver **múltiplos cargos ou perfis** (ex: Analista Meio Ambiente Perfil 1, Perfil 2, Técnico, etc.) e o usuário AINDA NÃO tiver informado na mensagem qual cargo/perfil vai prestar:
+     - Verifique se é possível identificar os cargos disponíveis.
+     - Se o usuário NÃO especificou o cargo, você pode:
+       a) Ou definir "ready": false e perguntar em "reply" para qual dos cargos/perfis do edital (liste os cargos encontrados no PDF!) ele vai estudar, para que você extraia as disciplinas exatas daquele cargo;
+       b) Ou, se ele já informou o cargo (ou pediu para extrair um cargo específico), defina "ready": true e extraia **100% DAS DISCIPLINAS daquele cargo**.
+2. REGRA DE OURO DA EXTRAÇÃO ("topics") — PROIBIDO OMITIR DISCIPLINAS:
+   - NUNCA omita nenhuma disciplina do cargo escolhido!
+   - Você DEVE incluir **TODAS as disciplinas** de Conhecimentos Básicos, Conhecimentos Gerais e Conhecimentos Específicos previstas no Quadro de Provas daquele cargo (ex: Língua Portuguesa, Raciocínio Lógico, História e Geografia de MT, Noções de Informática, Ética e Filosofia, Direito Constitucional, Direito Administrativo, Legislação Específica/Ambiental e cada matéria do bloco específico).
+   - Para CADA disciplina do cargo, crie todos os tópicos/capítulos necessários cobrindo integralmente o Anexo de Conteúdo Programático daquela matéria (gere quantos tópicos forem necessários: 30, 50, 70 ou 90+ tópicos no array "topics", sem limite artificial!).
+   - Use o nome exato da disciplina no campo "subject" e o assunto detalhado no campo "title".
+   - Defina "priority": "alta" para as disciplinas de maior peso/número de questões (especialmente Conhecimentos Específicos e Legislação) e "media" para as demais.
+3. Adaptação Orgânica por Modalidade:
+   - Matéria de faculdade: category = "faculdade", syllabus_label = "Ementa", has_essay = false.
+   - Concurso público SEM discursiva/redação: category = "concurso", syllabus_label = "Edital", has_essay = false.
+   - Concurso público COM prova discursiva/redação prevista no edital: category = "concurso", syllabus_label = "Edital", has_essay = true.
+   - Cursinho / Certificação: category = "cursinho", syllabus_label = "Módulos", has_essay = false.
+4. Gere também de 6 a 10 questões práticas ("questions") distribuídas entre as disciplinas extraídas e 6 a 10 cartões de memória ("flashcards") com prazos, conceitos ou regras importantes do documento.
+5. Em "reply", liste claramente todas as disciplinas que você encontrou e extraiu (com a quantidade de tópicos de cada uma) e pergunte ao usuário se o cargo/disciplinas estão completos ou se ele quer ajustar o cargo antes de abrir o painel.
 
 Retorne EXCLUSIVAMENTE um objeto JSON válido com este formato:
 {
   "ready": true,
-  "reply": "Texto natural para o usuário...",
+  "reply": "Analisei o edital completo para o cargo X. Extraí todas as N disciplinas do conteúdo programático (lista das disciplinas)...",
   "plan": {
-    "title": "Nome curto do estudo (ex: Banco de Dados II · UFMT)",
-    "subtitle": "Resumo curto (ex: Ciência da Computação · P1, P2 e Projeto)",
-    "category": "faculdade",
-    "syllabus_label": "Ementa",
-    "has_essay": false,
+    "title": "Nome do estudo e cargo (ex: SEMA-MT · Analista Ambiental)",
+    "subtitle": "Banca + Resumo das provas e pesos",
+    "category": "concurso",
+    "syllabus_label": "Edital",
+    "has_essay": true,
     "target_date": "YYYY-MM-DD ou vazio",
-    "daily_hours": "1h30 por dia",
-    "hero_title": "Frase curta motivadora para o topo do painel Hoje",
+    "daily_hours": "2h por dia",
+    "hero_title": "Frase curta motivadora para o painel Hoje",
     "context_cards": [
-      { "tag": "P1", "title": "Prova P1", "sub": "Unidades 1 e 2", "pill": "Prioridade" },
-      { "tag": "LAB", "title": "Listas & Prática", "sub": "Exercícios extraídos", "pill": "Ativo" },
-      { "tag": "META", "title": "Ritmo Diário", "sub": "Blocos organizados", "pill": "1h30/dia" }
+      { "tag": "ESP", "title": "Conhecimentos Específicos", "sub": "Resumo de questões e peso", "pill": "Prioridade" },
+      { "tag": "BAS", "title": "Conhecimentos Básicos/Gerais", "sub": "Disciplinas comuns do edital", "pill": "Base" },
+      { "tag": "PROVA", "title": "Avaliação & Data", "sub": "Resumo da prova/discursiva", "pill": "Meta" }
     ]
   },
   "topics": [
-    { "subject": "Unidade 1 · Fundamentos", "title": "Título específico do capítulo/aula", "priority": "alta" }
+    { "subject": "Nome da Disciplina 1", "title": "1. Tópico completo do conteúdo programático", "priority": "alta" }
   ],
   "questions": [
     {
-      "subject": "Unidade 1 · Fundamentos",
-      "stem": "Enunciado completo da questão...",
+      "subject": "Nome da Disciplina",
+      "stem": "Enunciado completo...",
       "options": [
         { "letter": "A", "text": "..." },
         { "letter": "B", "text": "..." },
@@ -231,10 +253,11 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido com este formato:
     }
   ],
   "flashcards": [
-    { "subject": "Unidade 1 · Fundamentos", "front": "Pergunta direta?", "back": "Resposta objetiva.", "tag": "Conceito" }
+    { "subject": "Nome da Disciplina", "front": "Pergunta direta?", "back": "Resposta objetiva.", "tag": "Edital" }
   ]
 }`;
 
+    // Attach the PDF to the latest turn that has fileBase64 so follow-up messages ("Mude para o cargo X" or "Inclua todas as disciplinas") still see the PDF
     const contents = messages.map((m: { role: string; text: string }, idx: number) => {
       const isLast = idx === messages.length - 1;
       if (isLast && fileBase64) {
@@ -242,7 +265,11 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido com este formato:
           role: 'user',
           parts: [
             { inlineData: { mimeType, data: fileBase64 } },
-            { text: m.text || `Analise o documento anexado (${fileName}) e monte meu plano de estudos completo.` },
+            {
+              text:
+                m.text ||
+                `Analise o documento anexado (${fileName}). Se for um edital com vários cargos e eu não especifiquei o cargo, me pergunte qual cargo vou fazer listando as opções encontradas, ou extraia 100% de todas as disciplinas (Básicos, Gerais e Específicos) sem omitir nenhuma matéria.`,
+            },
           ],
         };
       }
@@ -257,7 +284,9 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido com este formato:
         role: 'user',
         parts: [
           { inlineData: { mimeType, data: fileBase64 } },
-          { text: `Analise o arquivo anexado (${fileName}) e monte meu plano de estudos completo.` },
+          {
+            text: `Analise o arquivo anexado (${fileName}) e extraia todas as disciplinas e tópicos do conteúdo programático.`,
+          },
         ],
       });
     }
@@ -277,8 +306,8 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido com este formato:
           system_instruction: { parts: [{ text: systemInstruction }] },
           contents,
           generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 4096,
+            temperature: 0.25,
+            maxOutputTokens: 16384,
             responseMimeType: 'application/json',
           },
         }),
@@ -307,12 +336,12 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido com este formato:
     } catch {
       parsed = {
         ready: false,
-        reply: rawJson || 'Me conte um pouco mais sobre o que você quer estudar ou anexe o PDF da sua ementa/edital.',
+        reply: rawJson || 'Para qual cargo ou perfil deste edital você vai estudar? Me informe o cargo para eu extrair todas as disciplinas exatas dele.',
       };
     }
 
     return NextResponse.json({ ok: true, data: parsed });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Erro ao processar estudo' }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Erro ao processar documento' }, { status: 500 });
   }
 }

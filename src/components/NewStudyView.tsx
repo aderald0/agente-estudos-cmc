@@ -48,56 +48,63 @@ export function NewStudyView({
     {
       id: 1,
       role: 'assistant',
-      text: `Olá, ${displayName}. Para o que você vai estudar?\n\nVocê pode anexar o PDF do edital, a ementa da faculdade ou a sua apostila no clipe abaixo — ou simplesmente me contar o seu objetivo.`,
+      text: `Olá, ${displayName}. Para o que você vai estudar?\n\nVocê pode anexar o PDF do edital, a ementa da faculdade ou a sua apostila no clipe abaixo e me dizer o cargo ou objetivo.`,
     },
   ]);
   const [input, setInput] = useState('');
-  const [lastFileName, setLastFileName] = useState('');
+  // Pending file ready to be sent with the user's message (so they can specify the cargo!)
+  const [pendingFile, setPendingFile] = useState<{ name: string; base64: string; mimeType: string } | null>(null);
+  // Persisted file in memory across turns so follow-up answers ("Quero para o cargo Analista Ambiental Perfil X") still send the PDF to Gemini!
+  const [persistedFile, setPersistedFile] = useState<{ name: string; base64: string; mimeType: string } | null>(null);
+
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [latestDraft, setLatestDraft] = useState<DraftPlanData | null>(null);
+  const [expandedDraftId, setExpandedDraftId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, busy]);
 
-  async function handleFileSelect(files: FileList | null) {
+  function handleFileSelect(files: FileList | null) {
     if (!files || files.length === 0) return;
     const file = files[0];
-    if (file.size > 12 * 1024 * 1024) {
-      setError('O arquivo deve ter no máximo 12 MB.');
+    if (file.size > 18 * 1024 * 1024) {
+      setError('O arquivo deve ter no máximo 18 MB.');
       return;
     }
     setError('');
-    setLastFileName(file.name);
     const reader = new FileReader();
-    reader.onload = async () => {
+    reader.onload = () => {
       const result = String(reader.result || '');
       const base64 = result.includes(',') ? result.split(',')[1] : result;
       const mimeType = file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'text/plain');
-      await sendToAgent('', { name: file.name, base64, mimeType });
+      const fileObj = { name: file.name, base64, mimeType };
+      setPendingFile(fileObj);
+      setPersistedFile(fileObj);
+      inputRef.current?.focus();
     };
     reader.readAsDataURL(file);
   }
 
-  async function sendToAgent(
-    overrideText?: string,
-    overrideFile?: { name: string; base64: string; mimeType: string } | null
-  ) {
+  async function sendToAgent(overrideText?: string) {
     const text = (overrideText ?? input).trim();
-    const fileToUse = overrideFile || null;
-    if ((!text && !fileToUse) || busy) return;
+    const fileToSend = pendingFile || persistedFile;
+    if ((!text && !pendingFile) || busy) return;
 
+    const displayedFileName = pendingFile?.name;
     if (!overrideText) setInput('');
+    setPendingFile(null);
     setError('');
 
     const userMsg: SetupMsg = {
       id: Date.now(),
       role: 'user',
-      text: text || `Anexei ${fileToUse?.name}`,
-      fileName: fileToUse?.name,
+      text: text || `Analise o documento ${displayedFileName} e extraia todas as disciplinas.`,
+      fileName: displayedFileName,
     };
 
     const nextHistory = [...messages, userMsg];
@@ -112,14 +119,14 @@ export function NewStudyView({
         body: JSON.stringify({
           action: 'analyze',
           messages: nextHistory.map(m => ({ role: m.role, text: m.text })),
-          fileBase64: fileToUse?.base64 || '',
-          fileName: fileToUse?.name || '',
-          mimeType: fileToUse?.mimeType || '',
+          fileBase64: fileToSend?.base64 || '',
+          fileName: fileToSend?.name || '',
+          mimeType: fileToSend?.mimeType || '',
         }),
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json.error || 'Não foi possível analisar agora.');
+        setError(json.error || 'Não foi possível analisar o documento agora.');
         return;
       }
 
@@ -133,7 +140,7 @@ export function NewStudyView({
         {
           id: Date.now() + 1,
           role: 'assistant',
-          text: data?.reply || 'Organizei seus conteúdos. Deseja abrir o painel agora?',
+          text: data?.reply || 'Organizei seus conteúdos. Confira as disciplinas abaixo:',
           draft: data?.ready && data?.plan ? data : undefined,
         },
       ]);
@@ -176,7 +183,7 @@ export function NewStudyView({
     <div
       style={{
         minHeight: '100dvh',
-        maxWidth: 680,
+        maxWidth: 720,
         margin: '0 auto',
         padding: '20px 18px 24px',
         display: 'flex',
@@ -185,7 +192,7 @@ export function NewStudyView({
         gap: 16,
       }}
     >
-      {/* Top Minimal Header (Matches Prototype screenSetup) */}
+      {/* Top Minimal Header */}
       <header className="flex-row" style={{ justifyContent: 'space-between', padding: '4px 0' }}>
         <div className="flex-row" style={{ gap: 10 }}>
           <span className="brand-icon" style={{ width: 32, height: 32, borderRadius: 10 }}>
@@ -209,7 +216,7 @@ export function NewStudyView({
               <div key={m.id} style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <div className="mentor-msg-user">
                   {m.fileName && (
-                    <div className="flex-row" style={{ gap: 6, fontSize: 12, opacity: 0.9, marginBottom: 2 }}>
+                    <div className="flex-row" style={{ gap: 6, fontSize: 12, opacity: 0.9, marginBottom: 4 }}>
                       <Icons.Paperclip size={13} /> <strong>{m.fileName}</strong>
                     </div>
                   )}
@@ -219,9 +226,21 @@ export function NewStudyView({
             );
           }
 
+          // Group extracted topics by discipline/subject so the user sees ALL disciplines extracted from the Edital
+          const subjectMap = new Map<string, Array<{ title: string; priority: string }>>();
+          if (Array.isArray(m.draft?.topics)) {
+            m.draft.topics.forEach(t => {
+              const s = t.subject || 'Geral';
+              if (!subjectMap.has(s)) subjectMap.set(s, []);
+              subjectMap.get(s)!.push({ title: t.title, priority: t.priority });
+            });
+          }
+          const subjectEntries = Array.from(subjectMap.entries());
+          const isExpanded = expandedDraftId === m.id;
+
           return (
             <div key={m.id} style={{ display: 'flex', justifyContent: 'flex-start' }}>
-              <div className="mentor-msg-assistant" style={{ maxWidth: '92%', padding: '16px 20px' }}>
+              <div className="mentor-msg-assistant" style={{ maxWidth: '94%', padding: '16px 20px' }}>
                 <div style={{ whiteSpace: 'pre-line', lineHeight: 1.6, fontSize: 14 }}>{m.text}</div>
 
                 {m.draft?.plan && (
@@ -237,42 +256,77 @@ export function NewStudyView({
                   >
                     <div className="flex-row" style={{ justifyContent: 'space-between' }}>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: 14.5 }}>{m.draft.plan.title}</div>
+                        <div style={{ fontWeight: 700, fontSize: 15 }}>{m.draft.plan.title}</div>
                         <div className="text-xs muted">{m.draft.plan.subtitle}</div>
                       </div>
-                      <span className="ds-badge ds-badge-green">{m.draft.plan.daily_hours}</span>
+                      <span className="ds-badge ds-badge-green">
+                        {subjectEntries.length} disciplinas · {m.draft.topics?.length || 0} tópicos
+                      </span>
                     </div>
 
-                    {Array.isArray(m.draft.topics) && m.draft.topics.length > 0 && (
-                      <div className="text-xs muted" style={{ paddingTop: 6 }}>
-                        <strong style={{ color: 'var(--c-text)' }}>
-                          Conteúdos organizados ({m.draft.plan.syllabus_label}):
-                        </strong>
-                        <ul style={{ margin: '6px 0 0', paddingLeft: 18, display: 'grid', gap: 5 }}>
-                          {m.draft.topics.slice(0, 5).map((t, idx) => (
-                            <li key={idx}>
-                              <strong style={{ color: 'var(--c-text)' }}>{t.subject}:</strong> {t.title}
-                              {idx < 3 && (
-                                <span
-                                  className="ds-badge ds-badge-green"
-                                  style={{ marginLeft: 6, padding: '1px 7px', fontSize: 10.5 }}
-                                >
-                                  Hoje
-                                </span>
-                              )}
-                            </li>
+                    {/* All Extracted Disciplines Summary Chips */}
+                    {subjectEntries.length > 0 && (
+                      <div style={{ paddingTop: 6 }}>
+                        <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+                          <strong className="text-xs">
+                            Disciplinas extraídas ({subjectEntries.length}):
+                          </strong>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedDraftId(isExpanded ? null : m.id)}
+                            className="text-xs"
+                            style={{ fontWeight: 600, color: 'var(--c-accent)' }}
+                          >
+                            {isExpanded ? 'Recolher tópicos ▲' : `Ver todos os ${m.draft.topics?.length} tópicos ▼`}
+                          </button>
+                        </div>
+
+                        <div className="flex-row" style={{ gap: 6 }}>
+                          {subjectEntries.map(([subName, subTopics]) => (
+                            <span key={subName} className="ds-badge ds-badge-indigo" style={{ padding: '4px 10px' }}>
+                              {subName} ({subTopics.length})
+                            </span>
                           ))}
-                          {m.draft.topics.length > 5 && (
-                            <li>+ {m.draft.topics.length - 5} outros tópicos na sua grade...</li>
-                          )}
-                        </ul>
+                        </div>
+
+                        {isExpanded && (
+                          <div
+                            className="space-y-sm"
+                            style={{
+                              marginTop: 10,
+                              maxHeight: 260,
+                              overflowY: 'auto',
+                              padding: 10,
+                              borderRadius: 12,
+                              background: 'var(--c-surface)',
+                              border: '1px solid var(--c-border)',
+                            }}
+                          >
+                            {subjectEntries.map(([subName, subTopics]) => (
+                              <div key={subName} style={{ marginBottom: 8 }}>
+                                <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--c-text)' }}>
+                                  {subName} ({subTopics.length} tópicos)
+                                </div>
+                                <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 11.5 }} className="muted">
+                                  {subTopics.map((st, i) => (
+                                    <li key={i}>{st.title}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
+
+                    <div className="text-xs muted" style={{ paddingTop: 4 }}>
+                      Faltou alguma disciplina ou quer outro cargo deste PDF? Basta pedir no campo abaixo que eu complemento antes de criar!
+                    </div>
 
                     <div
                       className="flex-row"
                       style={{
-                        marginTop: 12,
+                        marginTop: 10,
                         paddingTop: 12,
                         borderTop: '1px solid var(--c-border)',
                         gap: 8,
@@ -283,14 +337,7 @@ export function NewStudyView({
                         onClick={() => confirmAndLaunch(m.draft)}
                         className="ds-btn ds-btn-primary"
                       >
-                        {saving ? 'Abrindo seu painel...' : 'Abrir meu painel agora →'}
-                      </button>
-                      <button
-                        disabled={saving || busy}
-                        onClick={() => sendToAgent('Ajuste minha rotina para 1h30 por dia.')}
-                        className="ds-btn ds-btn-secondary"
-                      >
-                        Tenho 1h30 por dia
+                        {saving ? 'Abrindo seu painel...' : 'Confirmar e abrir meu painel →'}
                       </button>
                     </div>
                   </div>
@@ -302,7 +349,7 @@ export function NewStudyView({
 
         {busy && (
           <div className="mentor-msg-assistant muted text-sm" style={{ padding: '14px 18px' }}>
-            Lendo documento e organizando seus conteúdos...
+            Lendo todas as páginas do documento e extraindo todas as disciplinas do conteúdo programático...
           </div>
         )}
 
@@ -310,9 +357,9 @@ export function NewStudyView({
         <div ref={endRef} />
       </div>
 
-      {/* Bottom Starter Cards & Unified Pill Composer (Matches Prototype screenSetup) */}
+      {/* Bottom Starter Cards & Unified Pill Composer */}
       <div className="space-y-sm" style={{ paddingTop: 6 }}>
-        {messages.length <= 1 && !busy && (
+        {messages.length <= 1 && !busy && !pendingFile && (
           <div
             style={{
               display: 'grid',
@@ -328,12 +375,7 @@ export function NewStudyView({
                 )
               }
               className="ds-card"
-              style={{
-                padding: '11px 14px',
-                textAlign: 'left',
-                borderRadius: 16,
-                transition: 'border-color 150ms ease',
-              }}
+              style={{ padding: '11px 14px', textAlign: 'left', borderRadius: 16 }}
             >
               <div style={{ fontWeight: 700, fontSize: 12.5 }}>Banco de Dados II · Faculdade</div>
               <div className="text-xs muted" style={{ fontSize: 11.5, marginTop: 2 }}>
@@ -344,20 +386,15 @@ export function NewStudyView({
             <button
               onClick={() =>
                 sendToAgent(
-                  'Vou estudar para o concurso de Analista Judiciário de TI do TRT (banca FCC, apenas prova objetiva sem discursiva), tenho 2h por dia.'
+                  'Vou estudar para o concurso da SEMA-MT, extraia todas as disciplinas de Conhecimentos Básicos, Gerais e Específicos.'
                 )
               }
               className="ds-card"
-              style={{
-                padding: '11px 14px',
-                textAlign: 'left',
-                borderRadius: 16,
-                transition: 'border-color 150ms ease',
-              }}
+              style={{ padding: '11px 14px', textAlign: 'left', borderRadius: 16 }}
             >
-              <div style={{ fontWeight: 700, fontSize: 12.5 }}>Analista Judiciário · TRT</div>
+              <div style={{ fontWeight: 700, fontSize: 12.5 }}>Concurso SEMA / Edital</div>
               <div className="text-xs muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                Concurso só com prova objetiva
+                Extrair todas as disciplinas do cargo
               </div>
             </button>
 
@@ -368,12 +405,7 @@ export function NewStudyView({
                 )
               }
               className="ds-card"
-              style={{
-                padding: '11px 14px',
-                textAlign: 'left',
-                borderRadius: 16,
-                transition: 'border-color 150ms ease',
-              }}
+              style={{ padding: '11px 14px', textAlign: 'left', borderRadius: 16 }}
             >
               <div style={{ fontWeight: 700, fontSize: 12.5 }}>Certificação AWS Architect</div>
               <div className="text-xs muted" style={{ fontSize: 11.5, marginTop: 2 }}>
@@ -383,7 +415,8 @@ export function NewStudyView({
           </div>
         )}
 
-        {lastFileName && (
+        {/* Attached PDF Staging Pill: allows the user to type the exact Cargo before clicking Enviar */}
+        {(pendingFile || persistedFile) && (
           <div
             className="flex-row"
             style={{
@@ -397,11 +430,24 @@ export function NewStudyView({
           >
             <div className="flex-row" style={{ gap: 6 }}>
               <Icons.Paperclip size={14} />
-              <strong>{lastFileName}</strong>
+              <strong>{(pendingFile || persistedFile)?.name}</strong>
+              {pendingFile && (
+                <span className="muted">
+                  — digite abaixo para qual cargo/área vai estudar (ou clique direto em Enviar)
+                </span>
+              )}
             </div>
-            <span style={{ color: 'var(--c-success)', fontWeight: 600, fontSize: 11.5 }}>
-              {busy ? 'Lendo arquivo...' : 'Lido com sucesso'}
-            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setPendingFile(null);
+                setPersistedFile(null);
+              }}
+              className="text-xs muted"
+              title="Remover arquivo"
+            >
+              ✕
+            </button>
           </div>
         )}
 
@@ -427,6 +473,7 @@ export function NewStudyView({
           </label>
 
           <textarea
+            ref={inputRef}
             rows={1}
             value={input}
             onChange={e => setInput(e.target.value)}
@@ -436,7 +483,11 @@ export function NewStudyView({
                 sendToAgent();
               }
             }}
-            placeholder="Conte o que vai estudar ou anexe o PDF no clipe..."
+            placeholder={
+              pendingFile
+                ? `Informe seu cargo no ${pendingFile.name} (ex: Analista Ambiental - Perfil X) e envie...`
+                : 'Anexe o PDF no clipe e informe seu cargo ou objetivo...'
+            }
             style={{ paddingLeft: 4 }}
           />
 
