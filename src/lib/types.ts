@@ -42,6 +42,9 @@ export interface EssayEntry {
   cargo: string;
   title: string;
   text: string;
+  score_content: number;
+  score_formal: number;
+  feedback: string;
 }
 
 export interface ChatMsg {
@@ -50,7 +53,28 @@ export interface ChatMsg {
   content: string;
 }
 
-export type NavTab = 'hoje' | 'mentor' | 'edital' | 'caderno';
+export interface PracticeQuestion {
+  id: string;
+  subject: string;
+  qnum: number;
+  stem: string;
+  options_json: string;
+  answer: string;
+  user_choice: string;
+  is_correct: boolean | null;
+}
+
+export interface Flashcard {
+  id: string;
+  subject: string;
+  front: string;
+  back: string;
+  tag: string;
+  box: number;
+  next_review_date: string;
+}
+
+export type NavTab = 'hoje' | 'pratica' | 'mentor' | 'edital' | 'caderno';
 
 export function fmtBR(iso: string) {
   if (!iso) return '—';

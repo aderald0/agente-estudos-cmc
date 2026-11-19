@@ -7,6 +7,7 @@ import { Icons } from './Icons';
 interface FocusModalProps {
   topic: Topic | null;
   onClose: () => void;
+  onVerifyFeynman: (topic: Topic, notes: string) => void;
   onSave: (payload: {
     id: string;
     minutes: number;
@@ -18,7 +19,7 @@ interface FocusModalProps {
   }) => Promise<void>;
 }
 
-export function FocusModal({ topic, onClose, onSave }: FocusModalProps) {
+export function FocusModal({ topic, onClose, onVerifyFeynman, onSave }: FocusModalProps) {
   const [preset, setPreset] = useState<15 | 25 | 50>(25);
   const [seconds, setSeconds] = useState(25 * 60);
   const [running, setRunning] = useState(false);
@@ -149,13 +150,23 @@ export function FocusModal({ topic, onClose, onSave }: FocusModalProps) {
           </div>
 
           <div>
-            <label className="field-label">Anotações da Sessão</label>
+            <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
+              <label className="field-label" style={{ margin: 0 }}>Resumo Feynman / Anotações da Sessão</label>
+              <button
+                type="button"
+                onClick={() => onVerifyFeynman(topic, notes)}
+                className="ds-btn ds-btn-ghost ds-btn-sm"
+                style={{ color: 'var(--c-primary)' }}
+              >
+                <Icons.Sparkles size={13} /> Validar meu resumo com Mentor
+              </button>
+            </div>
             <textarea
               className="ds-textarea"
               rows={3}
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder="Artigos importantes, fórmulas ou pontos de atenção..."
+              placeholder="Explique com suas palavras o que aprendeu neste capítulo (Técnica Feynman)..."
             />
           </div>
         </div>

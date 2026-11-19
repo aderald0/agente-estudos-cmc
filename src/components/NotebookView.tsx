@@ -187,6 +187,14 @@ export function NotebookView({
             <div className="prompt-callout">
               {ESSAY_PROMPTS.find(x => x.id === essayId)?.desc}
             </div>
+
+            <div className="flex-row" style={{ gap: 14, fontSize: 12, color: 'var(--c-text-muted)' }}>
+              <span>✓ Checklist Selecon:</span>
+              <span>• 20 a 30 linhas</span>
+              <span>• Responder aos 3 quesitos (80 pts)</span>
+              <span>• Linguagem impessoal &amp; coesão (20 pts)</span>
+            </div>
+
             <textarea
               className="ds-textarea"
               rows={11}
@@ -212,23 +220,38 @@ export function NotebookView({
                   onClick={() => {
                     if (!essayText.trim()) return;
                     const p = ESSAY_PROMPTS.find(x => x.id === essayId);
-                    onCorrectEssayWithMentor(`Corrija minha discursiva (${p?.cargo} — ${p?.title}) pela regra 80/20 do Edital:\n\n${essayText.trim()}`);
+                    onCorrectEssayWithMentor(
+                      `Avalie minha Prova Discursiva para ${p?.cargo} no tema "${p?.title}" seguindo o item 9.2.4 do Edital (Conteúdo 0 a 80 pts + Correção Formal 0 a 20 pts) e USE a ferramenta save_essay_evaluation para gravar minha nota no banco:\n\n${essayText.trim()}`
+                    );
                   }}
                   className="ds-btn ds-btn-primary"
                 >
-                  <Icons.Sparkles size={14} /> Corrigir com Mentor
+                  <Icons.Sparkles size={14} /> Corrigir &amp; Salvar Nota 80/20
                 </button>
               </div>
             </div>
 
             {essays.length > 0 && (
               <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: 12 }}>
-                <div className="text-xs muted" style={{ fontWeight: 600, marginBottom: 6 }}>Rascunhos salvos</div>
-                {essays.map(e => (
-                  <div key={e.id} className="text-xs muted" style={{ padding: '4px 0' }}>
-                    {fmtBR(e.date)} · <strong>[{e.cargo}]</strong> {e.title}
-                  </div>
-                ))}
+                <div className="text-xs muted" style={{ fontWeight: 600, marginBottom: 6 }}>Histórico de Discursivas &amp; Notas (80/20)</div>
+                {essays.map(e => {
+                  const total = (e.score_content || 0) + (e.score_formal || 0);
+                  return (
+                    <div key={e.id} className="activity-row" style={{ padding: '8px 0' }}>
+                      <div>
+                        <div className="text-xs muted">{fmtBR(e.date)} · <strong>[{e.cargo}]</strong> {e.title}</div>
+                        {e.feedback && <div className="text-xs" style={{ marginTop: 2 }}>{e.feedback}</div>}
+                      </div>
+                      {total > 0 ? (
+                        <span className={`ds-badge ${total >= 70 ? 'ds-badge-green' : total >= 40 ? 'ds-badge-amber' : 'ds-badge-red'}`}>
+                          {total}/100 ({e.score_content}C + {e.score_formal}F)
+                        </span>
+                      ) : (
+                        <span className="ds-badge ds-badge-neutral">Rascunho</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

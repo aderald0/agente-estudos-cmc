@@ -6,9 +6,10 @@ import { FocusModal } from '../components/FocusModal';
 import { Icons } from '../components/Icons';
 import { MentorView } from '../components/MentorView';
 import { NotebookView } from '../components/NotebookView';
+import { PracticeView } from '../components/PracticeView';
 import { TodayDashboard } from '../components/TodayDashboard';
 import { EXAM_DATE, SUBJECT_META } from '../lib/syllabus';
-import { ChatMsg, ErrorEntry, EssayEntry, NavTab, StudyLog, Topic } from '../lib/types';
+import { ChatMsg, ErrorEntry, EssayEntry, Flashcard, NavTab, PracticeQuestion, StudyLog, Topic } from '../lib/types';
 
 export default function HomePage() {
   const [tab, setTab] = useState<NavTab>('hoje');
@@ -31,6 +32,8 @@ export default function HomePage() {
   const [errors, setErrors] = useState<ErrorEntry[]>([]);
   const [essays, setEssays] = useState<EssayEntry[]>([]);
   const [chat, setChat] = useState<ChatMsg[]>([]);
+  const [questions, setQuestions] = useState<PracticeQuestion[]>([]);
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
 
   const [chatInput, setChatInput] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
@@ -63,6 +66,8 @@ export default function HomePage() {
       setErrors(data.errors || []);
       setEssays(data.essays || []);
       setChat(data.chat || []);
+      setQuestions(data.questions || []);
+      setFlashcards(data.flashcards || []);
     } catch (e) {
       setDbError(e instanceof Error ? e.message : 'Erro de conexão.');
     } finally {
@@ -150,6 +155,16 @@ export default function HomePage() {
     await loadState();
   }
 
+  async function practiceAction(payload: Record<string, unknown>) {
+    await fetch('/api/practice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload),
+    });
+    await loadState();
+  }
+
   async function sendMessage(overrideText?: string) {
     const text = (overrideText ?? chatInput).trim();
     if (!text || chatBusy) return;
@@ -190,9 +205,10 @@ export default function HomePage() {
 
   const tabTitles: Record<NavTab, string> = {
     hoje: 'Painel de Estudos · Hoje',
+    pratica: 'Prática Ativa · 200 Questões Selecon & Flashcards',
     mentor: 'Mentor Inteligente',
-    edital: 'Edital Verticalizado & Cruzamento',
-    caderno: 'Caderno, Discursiva & NotebookLM',
+    edital: 'Edital Verticalizado (Sumário das Apostilas)',
+    caderno: 'Caderno de Erros, Discursiva & NotebookLM',
   };
 
   if (!authChecked) {
@@ -275,6 +291,9 @@ export default function HomePage() {
             <button className={`side-link ${tab === 'hoje' ? 'active' : ''}`} onClick={() => setTab('hoje')}>
               <Icons.Home /> <span className="hide-collapsed">Hoje</span>
             </button>
+            <button className={`side-link ${tab === 'pratica' ? 'active' : ''}`} onClick={() => setTab('pratica')}>
+              <Icons.Check /> <span className="hide-collapsed">Questões &amp; Cards</span>
+            </button>
             <button className={`side-link ${tab === 'mentor' ? 'active' : ''}`} onClick={() => setTab('mentor')}>
               <Icons.Sparkles /> <span className="hide-collapsed">Mentor</span>
             </button>
@@ -339,6 +358,7 @@ export default function HomePage() {
           {tab === 'hoje' && (
             <TodayDashboard
               topics={topics}
+              questions={questions}
               loading={loading}
               onStartFocus={t => setFocusTopic(t)}
               onTopicAction={topicAction}
@@ -347,6 +367,18 @@ export default function HomePage() {
                 sendMessage('O que estudar hoje? Monte meu plano com os tópicos mais importantes.');
               }}
               onNavigate={setTab}
+            />
+          )}
+
+          {tab === 'pratica' && (
+            <PracticeView
+              questions={questions}
+              flashcards={flashcards}
+              onPracticeAction={practiceAction}
+              onExplainWithMentor={promptText => {
+                setTab('mentor');
+                sendMessage(promptText);
+              }}
             />
           )}
 
@@ -407,6 +439,9 @@ export default function HomePage() {
           <button className={`mob-nav-btn ${tab === 'hoje' ? 'active' : ''}`} onClick={() => setTab('hoje')}>
             <Icons.Home size={19} /> <span>Hoje</span>
           </button>
+          <button className={`mob-nav-btn ${tab === 'pratica' ? 'active' : ''}`} onClick={() => setTab('pratica')}>
+            <Icons.Check size={19} /> <span>Prática</span>
+          </button>
           <button className={`mob-nav-btn ${tab === 'mentor' ? 'active' : ''}`} onClick={() => setTab('mentor')}>
             <Icons.Sparkles size={19} /> <span>Mentor</span>
           </button>
@@ -423,6 +458,13 @@ export default function HomePage() {
       <FocusModal
         topic={focusTopic}
         onClose={() => setFocusTopic(null)}
+        onVerifyFeynman={(t, notes) => {
+          setFocusTopic(null);
+          setTab('mentor');
+          sendMessage(
+            `Valide meu resumo Feynman sobre o capítulo "${t.title}" (${t.subject}): "${notes || 'Sem anotações escritas — me faça 1 pergunta-chave para testar se compreendi.'}"`
+          );
+        }}
         onSave={async ({ id, minutes, q_right, q_total, mastery, notes, complete }) => {
           if (complete) {
             await topicAction({

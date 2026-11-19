@@ -74,6 +74,11 @@ export async function POST(req: Request) {
       const today = todayISO();
       const seq = [1, 3, 7, 15];
       const idx = seq.indexOf(Number(t.review_interval));
+      const qr = Number(t.q_right) || 0;
+      const qt = Number(t.q_total) || 0;
+      const lowAcc = qt >= 4 && (qr / qt) < 0.6;
+      const grade = String(body.grade || 'good');
+
       let rq = true;
       let nextInt = 1;
       let nextDate = addDaysISO(today, 1);
@@ -81,7 +86,12 @@ export async function POST(req: Request) {
       let mastery = Number(t.mastery) || 1;
       let kind = 'Rev. feita → +1d';
 
-      if (idx >= 0 && idx < seq.length - 1) {
+      if (grade === 'hard' || lowAcc) {
+        nextInt = 1;
+        nextDate = addDaysISO(today, 1);
+        mastery = Math.max(1, mastery - 1);
+        kind = 'SRS Adaptativo (<60% ou difícil) → Reiniciado +1d';
+      } else if (idx >= 0 && idx < seq.length - 1) {
         nextInt = seq[idx + 1];
         nextDate = addDaysISO(today, nextInt);
         mastery = Math.min(5, Math.max(mastery, idx + 3));
@@ -125,11 +135,15 @@ export async function POST(req: Request) {
     if (body.action === 'update') {
       const qr = Math.max(0, Number(body.q_right) || 0);
       const qt = Math.max(qr, Number(body.q_total) || 0);
-      const mastery = Math.min(5, Math.max(1, Number(body.mastery) || 1));
+      const lowAcc = qt >= 4 && (qr / qt) < 0.6;
+      const mastery = lowAcc ? Math.min(2, Number(body.mastery) || 2) : Math.min(5, Math.max(1, Number(body.mastery) || 1));
       const sq = Boolean(body.study_queue);
-      const rq = Boolean(body.review_queue);
+      const rq = Boolean(body.review_queue) || lowAcc;
+      const revInt = lowAcc ? 1 : (rq ? Math.max(1, Number(body.review_interval) || 1) : 0);
+      const revDate = lowAcc ? addDaysISO(todayISO(), 1) : (rq ? (body.next_review_date || addDaysISO(todayISO(), revInt)) : '');
+
       let status = 'nao-iniciado';
-      if (mastery === 5 && !sq) status = 'dominado';
+      if (mastery === 5 && !sq && !lowAcc) status = 'dominado';
       else if (rq) status = 'revisar';
       else if (sq || qt > 0) status = 'estudando';
 
@@ -138,8 +152,8 @@ export async function POST(req: Request) {
         SET study_queue = ${sq},
             study_date = ${sq ? (body.study_date || todayISO()) : ''},
             review_queue = ${rq},
-            next_review_date = ${rq ? (body.next_review_date || addDaysISO(todayISO(), 1)) : ''},
-            review_interval = ${rq ? Math.max(1, Number(body.review_interval) || 1) : 0},
+            next_review_date = ${revDate},
+            review_interval = ${revInt},
             mastery = ${mastery},
             q_right = ${qr},
             q_total = ${qt},

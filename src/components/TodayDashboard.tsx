@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { fmtBR, NavTab, Topic } from '../lib/types';
+import { fmtBR, NavTab, PracticeQuestion, Topic } from '../lib/types';
 import { Icons } from './Icons';
 
 interface TodayDashboardProps {
   topics: Topic[];
+  questions: PracticeQuestion[];
   loading: boolean;
   onStartFocus: (topic: Topic) => void;
   onTopicAction: (payload: Record<string, unknown>) => Promise<void>;
@@ -15,6 +16,7 @@ interface TodayDashboardProps {
 
 export function TodayDashboard({
   topics,
+  questions,
   loading,
   onStartFocus,
   onTopicAction,
@@ -37,18 +39,59 @@ export function TodayDashboard({
   useEffect(() => {
     if (!timerRunning) return;
     const id = setInterval(() => {
-      setTimerSec(prev => {
-        if (prev <= 1) {
-          setTimerRunning(false);
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimerSec(prev => (prev <= 1 ? (setTimerRunning(false), 0) : prev - 1));
     }, 1000);
     return () => clearInterval(id);
   }, [timerRunning]);
 
   const today = new Date().toISOString().slice(0, 10);
+
+  // Subject accuracy calculator combining topic manual stats + practice_questions
+  const readiness = useMemo(() => {
+    function getAreaStats(subjects: string[]) {
+      let right = 0;
+      let total = 0;
+      topics.filter(t => subjects.includes(t.subject)).forEach(t => {
+        right += t.q_right || 0;
+        total += t.q_total || 0;
+      });
+      // Fallback: if topic stats are 0, check practice_questions table directly
+      if (total === 0) {
+        questions.filter(q => subjects.includes(q.subject) && q.user_choice).forEach(q => {
+          total += 1;
+          if (q.is_correct) right += 1;
+        });
+      }
+      return { right, total, acc: total > 0 ? right / total : 0 };
+    }
+
+    // Analista TI areas (Item 9.1.3)
+    const anlBasicos = getAreaStats(['Língua Portuguesa', 'Raciocínio Lógico e Matemático', 'Noções de Informática']);
+    const anlGerais = getAreaStats(['História e Geografia de MT', 'Noções de Ética e Filosofia', 'Relações Interpessoais', 'Noções de Administração Pública']);
+    const anlEspec = getAreaStats(['Legislação Municipal', 'Conhecimentos Específicos — Analista TI']);
+    const anlScore = Math.round((anlBasicos.acc * 15 + anlGerais.acc * 15 + anlEspec.acc * 70) * 10) / 10;
+    const anlZeroArea = anlBasicos.total === 0 || anlGerais.total === 0 || anlEspec.total === 0;
+
+    // Técnico Legislativo areas (Item 9.1.3)
+    const tecBasicos = getAreaStats(['Língua Portuguesa', 'Raciocínio Lógico e Matemático', 'Noções de Informática', 'Legislação Municipal']);
+    const tecGerais = getAreaStats(['História e Geografia de MT', 'Noções de Ética e Filosofia', 'Relações Interpessoais']);
+    const tecEspec = getAreaStats(['Noções de Administração Pública', 'Conhecimentos Específicos — Técnico']);
+    const tecScore = Math.round((tecBasicos.acc * 15 + tecGerais.acc * 15 + tecEspec.acc * 70) * 10) / 10;
+    const tecZeroArea = tecBasicos.total === 0 || tecGerais.total === 0 || tecEspec.total === 0;
+
+    return {
+      anlScore,
+      anlBasicosPts: Math.round(anlBasicos.acc * 15 * 10) / 10,
+      anlGeraisPts: Math.round(anlGerais.acc * 15 * 10) / 10,
+      anlEspecPts: Math.round(anlEspec.acc * 70 * 10) / 10,
+      anlZeroArea,
+      tecScore,
+      tecBasicosPts: Math.round(tecBasicos.acc * 15 * 10) / 10,
+      tecGeraisPts: Math.round(tecGerais.acc * 15 * 10) / 10,
+      tecEspecPts: Math.round(tecEspec.acc * 70 * 10) / 10,
+      tecZeroArea,
+    };
+  }, [topics, questions]);
 
   const metrics = useMemo(() => {
     const anl = topics.filter(t => t.overlap !== 'exclusivo-tecnico');
@@ -166,6 +209,53 @@ export function TodayDashboard({
           </div>
           <div className="kpi-value">{metrics.hours}h {String(metrics.minsRem).padStart(2, '0')}m</div>
           <div className="kpi-sub">Acumulado em sessões</div>
+        </div>
+      </div>
+
+      {/* 1.5 TERMÔMETRO DE NOTA PROJETADA (EXAM READINESS 100 PTS) */}
+      <div className="bento-two">
+        <div className="ds-card ds-card-body">
+          <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Nota Projetada · Analista TI (100 pts)</div>
+              <div className="text-xs muted">Básicos {readiness.anlBasicosPts}/15 · Gerais {readiness.anlGeraisPts}/15 · Específicos {readiness.anlEspecPts}/70 (peso 1,75)</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: 22, fontWeight: 700 }}>{readiness.anlScore}</span>
+              <span className="text-xs muted"> /100</span>
+            </div>
+          </div>
+          <div className="ds-progress" style={{ height: 8, marginBottom: 8 }}>
+            <div className="ds-progress-fill indigo" style={{ width: `${Math.min(100, readiness.anlScore)}%` }} />
+          </div>
+          <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+            <span className={`ds-badge ${readiness.anlScore >= 75 ? 'ds-badge-green' : readiness.anlScore >= 40 && !readiness.anlZeroArea ? 'ds-badge-amber' : 'ds-badge-neutral'}`}>
+              {readiness.anlScore >= 75 ? 'Competitivo (Top 100)' : readiness.anlScore >= 40 && !readiness.anlZeroArea ? 'Acima do corte (40 pts)' : 'Pratique questões nas 3 áreas'}
+            </span>
+            <button onClick={() => onNavigate('pratica')} className="ds-btn ds-btn-ghost ds-btn-sm">Praticar 200 Questões →</button>
+          </div>
+        </div>
+
+        <div className="ds-card ds-card-body">
+          <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Nota Projetada · Técnico Leg. (100 pts)</div>
+              <div className="text-xs muted">Básicos {readiness.tecBasicosPts}/15 · Gerais {readiness.tecGeraisPts}/15 · Específicos {readiness.tecEspecPts}/70 (peso 1,75)</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: 22, fontWeight: 700 }}>{readiness.tecScore}</span>
+              <span className="text-xs muted"> /100</span>
+            </div>
+          </div>
+          <div className="ds-progress" style={{ height: 8, marginBottom: 8 }}>
+            <div className="ds-progress-fill blue" style={{ width: `${Math.min(100, readiness.tecScore)}%` }} />
+          </div>
+          <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+            <span className={`ds-badge ${readiness.tecScore >= 75 ? 'ds-badge-green' : readiness.tecScore >= 40 && !readiness.tecZeroArea ? 'ds-badge-amber' : 'ds-badge-neutral'}`}>
+              {readiness.tecScore >= 75 ? 'Competitivo (Top 220)' : readiness.tecScore >= 40 && !readiness.tecZeroArea ? 'Acima do corte (40 pts)' : 'Pratique questões nas 3 áreas'}
+            </span>
+            <button onClick={() => onNavigate('pratica')} className="ds-btn ds-btn-ghost ds-btn-sm">Abrir Flashcards Flip →</button>
+          </div>
         </div>
       </div>
 
@@ -307,12 +397,12 @@ export function TodayDashboard({
         </section>
       </div>
 
-      {/* 3. REVISÕES ESPAÇADAS (TIMELINE 1 -> 3 -> 7 -> 15d) */}
+      {/* 3. REVISÕES ESPAÇADAS ADAPTATIVAS (TIMELINE 1 -> 3 -> 7 -> 15d) */}
       <section className="ds-card">
         <div className="ds-card-header">
           <div>
-            <h2 className="ds-card-title">Revisões Espaçadas (1 → 3 → 7 → 15 dias)</h2>
-            <p className="ds-card-desc">Consolidação de memória até a data da prova</p>
+            <h2 className="ds-card-title">Revisões Espaçadas Adaptativas (1 → 3 → 7 → 15 dias)</h2>
+            <p className="ds-card-desc">Se acertar menos de 60% ou marcar Difícil, o ciclo reinicia em 1 dia</p>
           </div>
           <div className="ds-segmented">
             <button className={`ds-seg-item ${revFilter === 'hoje' ? 'active' : ''}`} onClick={() => setRevFilter('hoje')}>
@@ -339,22 +429,32 @@ export function TodayDashboard({
           <div className="timeline-list">
             {visibleReviews.map(t => {
               const step = t.review_interval || 1;
+              const lowAcc = t.q_total >= 4 && (t.q_right / t.q_total) < 0.6;
               return (
                 <div key={t.id} className="timeline-row">
                   <div className="timeline-step">
-                    <span className={`step-dot ${revFilter === 'hoje' ? 'warn' : revFilter === 'concluidas' ? 'green' : 'indigo'}`} />
+                    <span className={`step-dot ${lowAcc ? 'warn' : revFilter === 'hoje' ? 'warn' : revFilter === 'concluidas' ? 'green' : 'indigo'}`} />
                     <span className="step-label">{revFilter === 'concluidas' ? 'Dominado' : `${step}d`}</span>
                   </div>
                   <div className="timeline-content">
-                    <div className="text-xs muted">{t.subject} {t.next_review_date ? `· Agendada ${fmtBR(t.next_review_date)}` : ''}</div>
+                    <div className="text-xs muted">
+                      {t.subject} {t.next_review_date ? `· Agendada ${fmtBR(t.next_review_date)}` : ''}
+                      {lowAcc && <span className="ds-badge ds-badge-red" style={{ marginLeft: 6 }}>Reforço (&lt;60%)</span>}
+                    </div>
                     <div className="text-sm" style={{ fontWeight: 500 }}>{t.title}</div>
                   </div>
                   <div className="timeline-actions">
                     {revFilter !== 'concluidas' && (
                       <>
-                        <button onClick={() => onStartFocus(t)} className="ds-btn ds-btn-ghost ds-btn-sm">Revisar em Foco</button>
-                        <button onClick={() => onTopicAction({ action: 'complete_review', id: t.id })} className="ds-btn ds-btn-secondary ds-btn-sm">
-                          <Icons.Check size={14} /> Concluir
+                        <button
+                          onClick={() => onTopicAction({ action: 'complete_review', id: t.id, grade: 'hard' })}
+                          className="ds-btn ds-btn-ghost ds-btn-sm"
+                          title="Difícil: manter revisão para amanhã (+1d)"
+                        >
+                          Difícil (+1d)
+                        </button>
+                        <button onClick={() => onTopicAction({ action: 'complete_review', id: t.id, grade: 'good' })} className="ds-btn ds-btn-secondary ds-btn-sm">
+                          <Icons.Check size={14} /> Avançar Ciclo
                         </button>
                       </>
                     )}

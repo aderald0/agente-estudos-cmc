@@ -12,12 +12,14 @@ export async function GET() {
     await ensureSchema();
     const sql = getSql();
 
-    const [topics, logs, errors, essays, chat] = await Promise.all([
+    const [topics, logs, errors, essays, chat, questions, flashcards] = await Promise.all([
       sql`SELECT * FROM topics ORDER BY sort_order ASC, id ASC`,
       sql`SELECT * FROM study_logs ORDER BY id DESC LIMIT 40`,
       sql`SELECT * FROM error_entries ORDER BY id DESC LIMIT 100`,
       sql`SELECT * FROM essays ORDER BY id DESC LIMIT 30`,
       sql`SELECT * FROM chat_messages ORDER BY id ASC LIMIT 60`,
+      sql`SELECT * FROM practice_questions ORDER BY subject ASC, qnum ASC`,
+      sql`SELECT * FROM flashcards ORDER BY next_review_date ASC, id ASC`,
     ]);
 
     return NextResponse.json({
@@ -27,6 +29,8 @@ export async function GET() {
       errors,
       essays,
       chat,
+      questions,
+      flashcards,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erro ao conectar no banco Neon.';

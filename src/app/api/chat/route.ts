@@ -84,6 +84,36 @@ const AGENT_TOOLS = [{
         required: ['subject', 'title'],
       },
     },
+    {
+      name: 'create_flashcard',
+      description: 'Cria um novo flashcard de memorização (frente e verso) no deck de revisão ativa do aluno.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          subject: { type: 'STRING' },
+          front: { type: 'STRING', description: 'Pergunta curta e direta na frente do card' },
+          back: { type: 'STRING', description: 'Resposta objetiva em 1-2 linhas no verso' },
+          tag: { type: 'STRING', description: 'Tag curta (ex: LOM Art. 12 / ISO 27001)' },
+        },
+        required: ['subject', 'front', 'back'],
+      },
+    },
+    {
+      name: 'save_essay_evaluation',
+      description: 'Salva no histórico do banco a avaliação oficial de uma prova discursiva corrigida pelo Mentor (80 pts conteúdo + 20 pts correção formal).',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          cargo: { type: 'STRING' },
+          title: { type: 'STRING' },
+          text: { type: 'STRING' },
+          score_content: { type: 'INTEGER', description: 'Nota de conteúdo de 0 a 80' },
+          score_formal: { type: 'INTEGER', description: 'Nota de correção formal de 0 a 20' },
+          feedback: { type: 'STRING', description: 'Resumo do feedback em 1-2 frases' },
+        },
+        required: ['cargo', 'title', 'score_content', 'score_formal'],
+      },
+    },
   ],
 }];
 
@@ -247,6 +277,33 @@ async function executeDbTool(name: string, args: Record<string, unknown>) {
       VALUES (${id}, ${subject}, ${title}, ${overlap}, 'alta', ${sq ? 'estudando' : 'nao-iniciado'}, ${sq}, ${sq ? today : ''}, 999)
     `;
     return { result: { ok: true, id }, trace: `Tópico criado: ${title}` };
+  }
+
+  if (name === 'create_flashcard') {
+    const id = `fc-agent-${Date.now()}`;
+    const subject = String(args.subject || 'Legislação Municipal').slice(0, 120);
+    const front = String(args.front || '').slice(0, 500);
+    const back = String(args.back || '').slice(0, 800);
+    const tag = String(args.tag || 'Gerado pelo Mentor').slice(0, 80);
+    await sql`
+      INSERT INTO flashcards (id, subject, front, back, tag, box, next_review_date)
+      VALUES (${id}, ${subject}, ${front}, ${back}, ${tag}, 1, ${today})
+    `;
+    return { result: { ok: true, id }, trace: `Flashcard criado: ${tag}` };
+  }
+
+  if (name === 'save_essay_evaluation') {
+    const cargo = String(args.cargo || 'Analista TI');
+    const title = String(args.title || 'Treino Discursivo');
+    const text = String(args.text || '');
+    const sc = Math.min(80, Math.max(0, Number(args.score_content) || 0));
+    const sf = Math.min(20, Math.max(0, Number(args.score_formal) || 0));
+    const fb = String(args.feedback || '').slice(0, 600);
+    await sql`
+      INSERT INTO essays (date, cargo, title, text, score_content, score_formal, feedback)
+      VALUES (${today}, ${cargo}, ${title}, ${text}, ${sc}, ${sf}, ${fb})
+    `;
+    return { result: { ok: true, total: sc + sf }, trace: `Discursiva avaliada: ${sc + sf}/100 pts (${sc}+${sf})` };
   }
 
   return { result: { ok: false, error: 'Ferramenta desconhecida' }, trace: '' };

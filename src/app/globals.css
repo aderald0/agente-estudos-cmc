@@ -729,3 +729,108 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .mono { font-family: var(--font-mono), monospace; }
 .flex-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .space-y > * + * { margin-top: 12px; }
+
+/* ==========================================================================
+   PRACTICE QUIZ & FLASHCARDS FLIP
+   ========================================================================== */
+
+.q-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.q-option-btn {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--c-border);
+  background: var(--c-bg);
+  text-align: left;
+  transition: border-color var(--t-fast), background-color var(--t-fast);
+}
+.q-option-btn:hover {
+  border-color: var(--c-primary);
+  background: var(--c-surface-hover);
+}
+.q-option-btn.correct {
+  border-color: var(--c-success);
+  background: var(--c-success-soft);
+}
+.q-option-btn.wrong {
+  border-color: var(--c-error);
+  background: var(--c-error-soft);
+}
+.q-opt-letter {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.q-option-btn.correct .q-opt-letter {
+  background: var(--c-success);
+  color: #ffffff;
+  border-color: var(--c-success);
+}
+.q-option-btn.wrong .q-opt-letter {
+  background: var(--c-error);
+  color: #ffffff;
+  border-color: var(--c-error);
+}
+.q-opt-text {
+  font-size: 13.5px;
+  line-height: 1.45;
+  padding-top: 2px;
+}
+
+.flashcard-stage {
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.flashcard-box {
+  min-height: 250px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-md);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: transform var(--t-fast), border-color var(--t-fast);
+}
+.flashcard-box:hover {
+  border-color: var(--c-primary);
+}
+.flashcard-box.flipped {
+  background: var(--c-surface-2);
+  border-color: var(--c-primary);
+}
+.flashcard-content {
+  padding: 18px 8px;
+  max-width: 560px;
+}
+.flashcard-controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+@media (max-width: 540px) {
+  .flashcard-controls { grid-template-columns: 1fr; }
+}
+

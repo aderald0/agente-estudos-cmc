@@ -150,12 +150,21 @@ export function EditalView({
                   <div className="tree-children">
                     {items.map(t => {
                       const st = statusLabel(t.status);
+                      const lowAcc = t.q_total >= 4 && (t.q_right / t.q_total) < 0.6;
+                      const roiTxt =
+                        t.overlap === 'ponte-peso'
+                          ? 'ROI Máximo 1,75×'
+                          : t.overlap === 'exclusivo-analista' || t.overlap === 'exclusivo-tecnico'
+                          ? 'Peso 1,75×'
+                          : 'Peso 1,0× (2 Cargos)';
                       return (
                         <div key={t.id} className="tree-row">
                           <div className="tree-row-main">
                             <div className="tree-row-title">{t.title}</div>
                             <div className="tree-row-meta">
                               <span className={`ds-badge ${st.cls}`}>{st.txt}</span>
+                              <span className="ds-badge ds-badge-indigo">{roiTxt}</span>
+                              {lowAcc && <span className="ds-badge ds-badge-red">Crítico (&lt;60%)</span>}
                               <span className="mastery-dots" title={`Domínio ${t.mastery} de 5`}>
                                 {[1, 2, 3, 4, 5].map(n => (
                                   <span key={n} className={`m-dot ${n <= t.mastery ? 'filled' : ''}`} />
