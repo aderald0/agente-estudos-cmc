@@ -235,7 +235,26 @@ export function NotebookView({
         </section>
       )}
 
-      {tab === 'notebooklm' && (
+      {tab === 'notebooklm' && (() => {
+        const selectedTopic = topics.find(x => x.id === nlmTopicId) || topics[0];
+        let recNotebook = 'Caderno 1 - Núcleo Comum e Legislação';
+        let recReason = 'Matéria comum aos dois cargos (fontes na pasta Caderno 1).';
+        let recBadge = 'ds-badge-green';
+        if (selectedTopic?.overlap === 'exclusivo-analista') {
+          recNotebook = 'Caderno 2 - Analista TI';
+          recReason = 'Conteúdo exclusivo de Tecnologia da Informação (pasta Caderno 2).';
+          recBadge = 'ds-badge-indigo';
+        } else if (selectedTopic?.overlap === 'exclusivo-tecnico') {
+          recNotebook = 'Caderno 3 - Técnico Legislativo';
+          recReason = 'Conteúdo específico de Técnico Legislativo (pasta Caderno 3).';
+          recBadge = 'ds-badge-blue';
+        } else if (selectedTopic?.overlap === 'ponte-peso') {
+          recNotebook = 'Caderno 1 - Núcleo Comum e Legislação';
+          recReason = 'Disponível no Caderno 1 (e também nos Cadernos 2 e 3 para cruzamento).';
+          recBadge = 'ds-badge-amber';
+        }
+
+        return (
         <div className="bento-two">
           <section className="ds-card">
             <div className="ds-card-header">
@@ -245,15 +264,27 @@ export function NotebookView({
               </div>
             </div>
             <div className="ds-card-body space-y">
-              <a
-                href="https://drive.google.com/drive/folders/1RU85Ck3qASnCMvCL6TgH_V6_OmwoPNTR"
-                target="_blank"
-                rel="noopener"
-                className="ds-btn ds-btn-primary"
-                style={{ width: '100%', textDecoration: 'none' }}
-              >
-                Abrir Pasta no Google Drive
-              </a>
+              <div className="flex-row">
+                <a
+                  href="https://notebooklm.google.com"
+                  target="_blank"
+                  rel="noopener"
+                  className="ds-btn ds-btn-primary"
+                  style={{ flex: 1, textDecoration: 'none' }}
+                >
+                  Abrir NotebookLM
+                </a>
+                <a
+                  href="https://drive.google.com/drive/folders/1RU85Ck3qASnCMvCL6TgH_V6_OmwoPNTR"
+                  target="_blank"
+                  rel="noopener"
+                  className="ds-btn ds-btn-secondary"
+                  style={{ flex: 1, textDecoration: 'none' }}
+                >
+                  Pasta no Drive
+                </a>
+              </div>
+
               <button
                 onClick={() => {
                   let md = `# Progresso & Erros CMC 2026 (${today})\n\n`;
@@ -267,7 +298,7 @@ export function NotebookView({
                 className="ds-btn ds-btn-secondary"
                 style={{ width: '100%' }}
               >
-                Exportar Progresso + Erros (.md)
+                Exportar Progresso + Erros (.md) p/ subir como fonte
               </button>
 
               <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: 12 }} className="space-y">
@@ -281,16 +312,33 @@ export function NotebookView({
                   <option value="leiseca">Prazos &amp; Quóruns</option>
                   <option value="quiz">Simulado 10 Questões</option>
                 </select>
+
+                {/* Indicação exata do Caderno */}
+                <div className="prompt-callout" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+                    <span className="text-xs" style={{ fontWeight: 700, color: 'var(--c-text)' }}>Onde colar este prompt:</span>
+                    <span className={`ds-badge ${recBadge}`}>{recNotebook}</span>
+                  </div>
+                  <span className="text-xs muted">{recReason}</span>
+                </div>
+
                 <textarea className="ds-textarea mono" rows={4} readOnly value={nlmPrompt} />
                 <div className="flex-row">
                   <button
                     onClick={() => { navigator.clipboard.writeText(nlmPrompt); setNlmCopied('Prompt copiado.'); setTimeout(() => setNlmCopied(''), 2000); }}
-                    className="ds-btn ds-btn-secondary ds-btn-sm"
+                    className="ds-btn ds-btn-primary ds-btn-sm"
                   >
                     Copiar Prompt
                   </button>
                   {nlmCopied && <span className="text-xs" style={{ color: 'var(--c-success)' }}>{nlmCopied}</span>}
                 </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: 12 }} className="text-xs muted space-y">
+                <div style={{ fontWeight: 600, color: 'var(--c-text)' }}>Mapa rápido dos seus 3 cadernos:</div>
+                <div><strong>1. Núcleo Comum e Legislação:</strong> Português, RLM, Informática, Hist./Geo. MT, Ética, Relações, Adm. Pública e Legislação Municipal.</div>
+                <div><strong>2. Analista TI:</strong> Conhecimentos Específicos TI + Legislação Municipal + Adm. Pública.</div>
+                <div><strong>3. Técnico Legislativo:</strong> Conhecimentos Específicos Técnico + Legislação Municipal + Português.</div>
               </div>
             </div>
           </section>
@@ -325,7 +373,8 @@ export function NotebookView({
             )}
           </section>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
