@@ -99,8 +99,9 @@ export async function ensureSchema() {
     )
   `;
 
-  const existing = await sql`SELECT COUNT(*)::int AS cnt FROM topics`;
-  if ((existing[0]?.cnt ?? 0) === 0) {
+  const hasToc = await sql`SELECT 1 FROM topics WHERE id = 'lp-cap-1' LIMIT 1`;
+  if (hasToc.length === 0) {
+    await sql`DELETE FROM topics WHERE id NOT LIKE 'custom-%'`;
     for (let i = 0; i < INITIAL_TOPICS.length; i++) {
       const t = INITIAL_TOPICS[i];
       await sql`
