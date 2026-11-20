@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef } from 'react';
+import { extractDocumentClient } from '../lib/pdfClient';
 import { ChatMsg, StudyPlan, Topic } from '../lib/types';
 import { Icons } from './Icons';
 
@@ -11,7 +12,10 @@ interface MentorViewProps {
   chatInput: string;
   chatBusy: boolean;
   onChangeInput: (val: string) => void;
-  onSend: (overrideText?: string, fileObj?: { name: string; base64: string; mimeType: string }) => void;
+  onSend: (
+    overrideText?: string,
+    fileObj?: { name: string; extractedText?: string; base64?: string; mimeType: string }
+  ) => void;
   onClear: () => void;
   onStartFocus: (topic: Topic) => void;
 }
@@ -55,21 +59,22 @@ export function MentorView({
 
   const activeQueue = useMemo(() => topics.filter(t => t.study_queue), [topics]);
 
-  function handleFileAttach(files: FileList | null) {
+  async function handleFileAttach(files: FileList | null) {
     if (!files || files.length === 0) return;
-    const f = files[0];
-    if (f.size > 12 * 1024 * 1024) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const res = String(reader.result || '');
-      const base64 = res.includes(',') ? res.split(',')[1] : res;
-      const mimeType = f.type || (f.name.endsWith('.pdf') ? 'application/pdf' : 'text/plain');
+    try {
+      const doc = await extractDocumentClient(files[0]);
       onSend(
-        chatInput.trim() || `Analise o documento anexado (${f.name}) e adicione novos tópicos ou cartões relevantes ao meu estudo.`,
-        { name: f.name, base64, mimeType }
+        chatInput.trim() || `Analise o documento anexado (${doc.name}) e adicione os tópicos/disciplinas faltantes ao meu estudo.`,
+        {
+          name: doc.name,
+          extractedText: doc.extractedText,
+          base64: doc.fallbackBase64,
+          mimeType: doc.mimeType,
+        }
       );
-    };
-    reader.readAsDataURL(f);
+    } catch {
+      // Ignore invalid files silently
+    }
   }
 
   return (

@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { extractDocumentClient, ParsedDocument } from '../lib/pdfClient';
 import { Icons } from './Icons';
 
 interface DraftPlanData {
   ready: boolean;
   reply: string;
+  quick_options?: string[];
   plan?: {
     title: string;
     subtitle: string;
@@ -26,7 +28,8 @@ interface SetupMsg {
   id: number;
   role: 'user' | 'assistant';
   text: string;
-  fileName?: string;
+  fileNames?: string[];
+  quickOptions?: string[];
   draft?: DraftPlanData;
 }
 
@@ -48,15 +51,12 @@ export function NewStudyView({
     {
       id: 1,
       role: 'assistant',
-      text: `Olá, ${displayName}. Para o que você vai estudar?\n\nVocê pode anexar o PDF do edital, a ementa da faculdade ou a sua apostila no clipe abaixo e me dizer o cargo ou objetivo.`,
+      text: `Olá, ${displayName}. Para o que você vai estudar?\n\nAnexe o PDF do edital, a ementa da faculdade ou suas apostilas no clipe abaixo — vou ler o documento completo e fazer algumas perguntas rápidas (como o cargo e sua rotina) para montar seu plano sob medida.`,
     },
   ]);
   const [input, setInput] = useState('');
-  // Pending file ready to be sent with the user's message (so they can specify the cargo!)
-  const [pendingFile, setPendingFile] = useState<{ name: string; base64: string; mimeType: string } | null>(null);
-  // Persisted file in memory across turns so follow-up answers ("Quero para o cargo Analista Ambiental Perfil X") still send the PDF to Gemini!
-  const [persistedFile, setPersistedFile] = useState<{ name: string; base64: string; mimeType: string } | null>(null);
-
+  const [attachedDocs, setAttachedDocs] = useState<ParsedDocument[]>([]);
+  const [parsingPdf, setParsingPdf] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [latestDraft, setLatestDraft] = useState<DraftPlanData | null>(null);
@@ -67,44 +67,54 @@ export function NewStudyView({
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, busy]);
+  }, [messages, busy, parsingPdf]);
 
-  function handleFileSelect(files: FileList | null) {
+  async function handleFileSelect(files: FileList | null) {
     if (!files || files.length === 0) return;
-    const file = files[0];
-    if (file.size > 18 * 1024 * 1024) {
-      setError('O arquivo deve ter no máximo 18 MB.');
-      return;
-    }
     setError('');
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || '');
-      const base64 = result.includes(',') ? result.split(',')[1] : result;
-      const mimeType = file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'text/plain');
-      const fileObj = { name: file.name, base64, mimeType };
-      setPendingFile(fileObj);
-      setPersistedFile(fileObj);
-      inputRef.current?.focus();
-    };
-    reader.readAsDataURL(file);
+    setParsingPdf(true);
+
+    try {
+      const newlyParsed: ParsedDocument[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const doc = await extractDocumentClient(files[i]);
+        newlyParsed.push(doc);
+      }
+
+      const updatedDocs = [...attachedDocs, ...newlyParsed];
+      setAttachedDocs(updatedDocs);
+
+      // Automatically trigger Phase 1 (Interview & Cargo Discovery) right after reading the PDF
+      await sendToAgent(
+        input.trim() ||
+          `Anexei ${newlyParsed.map(d => `${d.name}${d.pageCount ? ` (${d.pageCount} páginas)` : ''}`).join(', ')}. Analise o documento e me faça as perguntas necessárias para montar meu plano.`,
+        updatedDocs,
+        newlyParsed.map(d => d.name)
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível ler o arquivo selecionado.');
+    } finally {
+      setParsingPdf(false);
+    }
   }
 
-  async function sendToAgent(overrideText?: string) {
+  async function sendToAgent(
+    overrideText?: string,
+    overrideDocs?: ParsedDocument[],
+    newFileNames?: string[]
+  ) {
     const text = (overrideText ?? input).trim();
-    const fileToSend = pendingFile || persistedFile;
-    if ((!text && !pendingFile) || busy) return;
+    const docsToSend = overrideDocs ?? attachedDocs;
+    if ((!text && docsToSend.length === 0) || busy) return;
 
-    const displayedFileName = pendingFile?.name;
     if (!overrideText) setInput('');
-    setPendingFile(null);
     setError('');
 
     const userMsg: SetupMsg = {
       id: Date.now(),
       role: 'user',
-      text: text || `Analise o documento ${displayedFileName} e extraia todas as disciplinas.`,
-      fileName: displayedFileName,
+      text,
+      fileNames: newFileNames,
     };
 
     const nextHistory = [...messages, userMsg];
@@ -119,9 +129,7 @@ export function NewStudyView({
         body: JSON.stringify({
           action: 'analyze',
           messages: nextHistory.map(m => ({ role: m.role, text: m.text })),
-          fileBase64: fileToSend?.base64 || '',
-          fileName: fileToSend?.name || '',
-          mimeType: fileToSend?.mimeType || '',
+          documents: docsToSend,
         }),
       });
       const json = await res.json();
@@ -140,10 +148,12 @@ export function NewStudyView({
         {
           id: Date.now() + 1,
           role: 'assistant',
-          text: data?.reply || 'Organizei seus conteúdos. Confira as disciplinas abaixo:',
+          text: data?.reply || 'Qual cargo ou objetivo você deseja priorizar?',
+          quickOptions: Array.isArray(data?.quick_options) ? data.quick_options.slice(0, 10) : undefined,
           draft: data?.ready && data?.plan ? data : undefined,
         },
       ]);
+      inputRef.current?.focus();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro de conexão.');
     } finally {
@@ -183,7 +193,7 @@ export function NewStudyView({
     <div
       style={{
         minHeight: '100dvh',
-        maxWidth: 720,
+        maxWidth: 740,
         margin: '0 auto',
         padding: '20px 18px 24px',
         display: 'flex',
@@ -210,14 +220,14 @@ export function NewStudyView({
 
       {/* Center Conversation Stream */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 2px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {messages.map(m => {
+        {messages.map((m, msgIdx) => {
           if (m.role === 'user') {
             return (
               <div key={m.id} style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <div className="mentor-msg-user">
-                  {m.fileName && (
+                  {m.fileNames && m.fileNames.length > 0 && (
                     <div className="flex-row" style={{ gap: 6, fontSize: 12, opacity: 0.9, marginBottom: 4 }}>
-                      <Icons.Paperclip size={13} /> <strong>{m.fileName}</strong>
+                      <Icons.Paperclip size={13} /> <strong>{m.fileNames.join(', ')}</strong>
                     </div>
                   )}
                   <div>{m.text}</div>
@@ -226,7 +236,7 @@ export function NewStudyView({
             );
           }
 
-          // Group extracted topics by discipline/subject so the user sees ALL disciplines extracted from the Edital
+          const isLatestMsg = msgIdx === messages.length - 1;
           const subjectMap = new Map<string, Array<{ title: string; priority: string }>>();
           if (Array.isArray(m.draft?.topics)) {
             m.draft.topics.forEach(t => {
@@ -243,6 +253,24 @@ export function NewStudyView({
               <div className="mentor-msg-assistant" style={{ maxWidth: '94%', padding: '16px 20px' }}>
                 <div style={{ whiteSpace: 'pre-line', lineHeight: 1.6, fontSize: 14 }}>{m.text}</div>
 
+                {/* Clickable Interview Options (e.g., exact Cargos extracted from the Edital PDF) */}
+                {isLatestMsg && !busy && m.quickOptions && m.quickOptions.length > 0 && !m.draft?.plan && (
+                  <div className="flex-row" style={{ marginTop: 12, gap: 6 }}>
+                    {m.quickOptions.map((opt, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => sendToAgent(opt)}
+                        className="quick-chip"
+                        style={{ color: 'var(--c-text)', borderColor: 'var(--c-border-strong)' }}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Complete Study Blueprint Preview */}
                 {m.draft?.plan && (
                   <div
                     className="space-y-sm"
@@ -264,7 +292,6 @@ export function NewStudyView({
                       </span>
                     </div>
 
-                    {/* All Extracted Disciplines Summary Chips */}
                     {subjectEntries.length > 0 && (
                       <div style={{ paddingTop: 6 }}>
                         <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
@@ -294,9 +321,9 @@ export function NewStudyView({
                             className="space-y-sm"
                             style={{
                               marginTop: 10,
-                              maxHeight: 260,
+                              maxHeight: 280,
                               overflowY: 'auto',
-                              padding: 10,
+                              padding: 12,
                               borderRadius: 12,
                               background: 'var(--c-surface)',
                               border: '1px solid var(--c-border)',
@@ -320,7 +347,7 @@ export function NewStudyView({
                     )}
 
                     <div className="text-xs muted" style={{ paddingTop: 4 }}>
-                      Faltou alguma disciplina ou quer outro cargo deste PDF? Basta pedir no campo abaixo que eu complemento antes de criar!
+                      Faltou alguma disciplina ou quer ajustar o cargo/horário? Peça abaixo antes de confirmar.
                     </div>
 
                     <div
@@ -347,9 +374,15 @@ export function NewStudyView({
           );
         })}
 
+        {parsingPdf && (
+          <div className="mentor-msg-assistant muted text-sm" style={{ padding: '14px 18px' }}>
+            Extraindo o texto completo de todas as páginas do PDF...
+          </div>
+        )}
+
         {busy && (
           <div className="mentor-msg-assistant muted text-sm" style={{ padding: '14px 18px' }}>
-            Lendo todas as páginas do documento e extraindo todas as disciplinas do conteúdo programático...
+            Analisando o conteúdo do documento...
           </div>
         )}
 
@@ -357,97 +390,37 @@ export function NewStudyView({
         <div ref={endRef} />
       </div>
 
-      {/* Bottom Starter Cards & Unified Pill Composer */}
+      {/* Bottom Attached Files & Unified Pill Composer */}
       <div className="space-y-sm" style={{ paddingTop: 6 }}>
-        {messages.length <= 1 && !busy && !pendingFile && (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(195px, 1fr))',
-              gap: 8,
-              marginBottom: 4,
-            }}
-          >
-            <button
-              onClick={() =>
-                sendToAgent(
-                  'Vou estudar Banco de Dados II na faculdade (provas P1, P2 e projeto prático SQL), tenho 1h30 por dia e minha P1 é daqui a 18 dias.'
-                )
-              }
-              className="ds-card"
-              style={{ padding: '11px 14px', textAlign: 'left', borderRadius: 16 }}
-            >
-              <div style={{ fontWeight: 700, fontSize: 12.5 }}>Banco de Dados II · Faculdade</div>
-              <div className="text-xs muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                Montar ementa com P1, P2 e trabalho
+        {attachedDocs.length > 0 && (
+          <div className="flex-row" style={{ gap: 6 }}>
+            {attachedDocs.map((doc, idx) => (
+              <div
+                key={`${doc.name}-${idx}`}
+                className="flex-row"
+                style={{
+                  gap: 6,
+                  padding: '5px 11px',
+                  borderRadius: 9999,
+                  background: 'var(--c-surface-2)',
+                  border: '1px solid var(--c-border)',
+                  fontSize: 11.5,
+                }}
+              >
+                <Icons.Paperclip size={12} />
+                <strong>{doc.name}</strong>
+                {doc.pageCount > 0 && <span className="muted">({doc.pageCount}p)</span>}
+                <button
+                  type="button"
+                  onClick={() => setAttachedDocs(prev => prev.filter((_, i) => i !== idx))}
+                  className="muted"
+                  title="Remover anexo"
+                  style={{ marginLeft: 2 }}
+                >
+                  ✕
+                </button>
               </div>
-            </button>
-
-            <button
-              onClick={() =>
-                sendToAgent(
-                  'Vou estudar para o concurso da SEMA-MT, extraia todas as disciplinas de Conhecimentos Básicos, Gerais e Específicos.'
-                )
-              }
-              className="ds-card"
-              style={{ padding: '11px 14px', textAlign: 'left', borderRadius: 16 }}
-            >
-              <div style={{ fontWeight: 700, fontSize: 12.5 }}>Concurso SEMA / Edital</div>
-              <div className="text-xs muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                Extrair todas as disciplinas do cargo
-              </div>
-            </button>
-
-            <button
-              onClick={() =>
-                sendToAgent(
-                  'Estou fazendo um cursinho para a Certificação AWS Solutions Architect (SAA-C03), tenho 1h45 por dia e quero foco em módulos e simulados.'
-                )
-              }
-              className="ds-card"
-              style={{ padding: '11px 14px', textAlign: 'left', borderRadius: 16 }}
-            >
-              <div style={{ fontWeight: 700, fontSize: 12.5 }}>Certificação AWS Architect</div>
-              <div className="text-xs muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                Módulos do curso + simulados
-              </div>
-            </button>
-          </div>
-        )}
-
-        {/* Attached PDF Staging Pill: allows the user to type the exact Cargo before clicking Enviar */}
-        {(pendingFile || persistedFile) && (
-          <div
-            className="flex-row"
-            style={{
-              justifyContent: 'space-between',
-              padding: '8px 14px',
-              borderRadius: 14,
-              background: 'var(--c-surface-2)',
-              border: '1px solid var(--c-border)',
-              fontSize: 12,
-            }}
-          >
-            <div className="flex-row" style={{ gap: 6 }}>
-              <Icons.Paperclip size={14} />
-              <strong>{(pendingFile || persistedFile)?.name}</strong>
-              {pendingFile && (
-                <span className="muted">
-                  — digite abaixo para qual cargo/área vai estudar (ou clique direto em Enviar)
-                </span>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setPendingFile(null);
-                setPersistedFile(null);
-              }}
-              className="text-xs muted"
-              title="Remover arquivo"
-            >
-              ✕
-            </button>
+            ))}
           </div>
         )}
 
@@ -461,14 +434,18 @@ export function NewStudyView({
               cursor: 'pointer',
               flexShrink: 0,
             }}
-            title="Anexar PDF (edital, ementa da faculdade ou apostila)"
+            title="Anexar PDF (edital, ementa da faculdade ou apostilas)"
           >
             <Icons.Paperclip size={16} />
             <input
               type="file"
               accept=".pdf,.txt,.md"
+              multiple
               style={{ display: 'none' }}
-              onChange={e => handleFileSelect(e.target.files)}
+              onChange={e => {
+                handleFileSelect(e.target.files);
+                e.target.value = '';
+              }}
             />
           </label>
 
@@ -484,15 +461,15 @@ export function NewStudyView({
               }
             }}
             placeholder={
-              pendingFile
-                ? `Informe seu cargo no ${pendingFile.name} (ex: Analista Ambiental - Perfil X) e envie...`
-                : 'Anexe o PDF no clipe e informe seu cargo ou objetivo...'
+              attachedDocs.length > 0
+                ? 'Responda às perguntas do mentor (cargo, horas/dia, nível)...'
+                : 'Anexe o PDF do edital/ementa no clipe ou conte o que vai estudar...'
             }
             style={{ paddingLeft: 4 }}
           />
 
           <button
-            disabled={busy || saving}
+            disabled={busy || saving || parsingPdf}
             onClick={() => sendToAgent()}
             className="ds-btn ds-btn-primary"
             style={{ height: 36, padding: '0 16px' }}

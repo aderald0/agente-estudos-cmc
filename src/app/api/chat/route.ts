@@ -3,6 +3,8 @@ import { getCurrentSession, verifySameOrigin } from '../../../lib/auth';
 import { addDaysISO, DEFAULT_PLAN_ID, ensureSchema, getSql, todayISO } from '../../../lib/db';
 import { EXAM_DATE } from '../../../lib/syllabus';
 
+export const maxDuration = 60;
+
 const AGENT_TOOLS = [{
   functionDeclarations: [
     {
@@ -346,10 +348,11 @@ export async function POST(req: Request) {
     const planId = String(body.plan_id || DEFAULT_PLAN_ID);
     const userText = String(body.message || '').trim();
     const fileBase64 = typeof body.fileBase64 === 'string' ? body.fileBase64 : '';
+    const extractedText = typeof body.extractedText === 'string' ? body.extractedText : '';
     const fileName = typeof body.fileName === 'string' ? body.fileName : '';
     const mimeType = typeof body.mimeType === 'string' ? body.mimeType : 'application/pdf';
 
-    if (!userText && !fileBase64) {
+    if (!userText && !fileBase64 && !extractedText) {
       return NextResponse.json({ error: 'Mensagem vazia' }, { status: 400 });
     }
 
@@ -423,15 +426,18 @@ ESTADO ATUAL DO ESTUDO (JSON):
 ${JSON.stringify(snapshot)}`;
 
     const history: Array<{ role: string; parts: Array<Record<string, unknown>> }> = recentChat.reverse().map((m, idx, arr) => {
-      const isLastUser = idx === arr.length - 1 && m.role === 'user' && fileBase64;
+      const isLastUser = idx === arr.length - 1 && m.role === 'user' && (fileBase64 || extractedText);
       if (isLastUser) {
-        return {
-          role: 'user',
-          parts: [
-            { inlineData: { mimeType, data: fileBase64 } },
-            { text: userText || `Analise o documento anexado (${fileName}) e extraia todos os tópicos e disciplinas faltantes usando bulk_add_topics.` },
-          ],
-        };
+        const attachmentParts: Array<Record<string, unknown>> = [];
+        if (extractedText) {
+          attachmentParts.push({ text: `=== DOCUMENTO ANEXADO (${fileName}) ===\n${extractedText}\n=== FIM DO DOCUMENTO ===` });
+        } else if (fileBase64) {
+          attachmentParts.push({ inlineData: { mimeType, data: fileBase64 } });
+        }
+        attachmentParts.push({
+          text: userText || `Analise o documento anexado (${fileName}) e extraia todos os tópicos e disciplinas faltantes usando bulk_add_topics.`,
+        });
+        return { role: 'user', parts: attachmentParts };
       }
       return {
         role: m.role === 'user' ? 'user' : 'model',

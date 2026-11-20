@@ -52,6 +52,9 @@ export default function HomePage() {
   const [activePlanId, setActivePlanId] = useState<string>(DEFAULT_PLAN_ID);
   const [activePlan, setActivePlan] = useState<StudyPlan | null>(null);
   const [showNewStudySetup, setShowNewStudySetup] = useState(false);
+  const [showManagePlansModal, setShowManagePlansModal] = useState(false);
+  const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
+  const [planManageError, setPlanManageError] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState('');
@@ -242,23 +245,41 @@ export default function HomePage() {
       setShowNewStudySetup(true);
       return;
     }
+    if (newPlanId === '__manage__') {
+      setPlanManageError('');
+      setShowManagePlansModal(true);
+      return;
+    }
     setShowNewStudySetup(false);
     setActivePlanId(newPlanId);
     localStorage.setItem('pierre_active_plan', newPlanId);
     await loadState(newPlanId);
   }
 
-  async function handleDeleteCurrentPlan() {
-    if (!activePlan || activePlan.id === DEFAULT_PLAN_ID) return;
-    if (!window.confirm(`Deseja remover o estudo "${activePlan.title}"?`)) return;
-    await fetch('/api/plans', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ action: 'delete', plan_id: activePlan.id }),
-    });
-    setActivePlanId(DEFAULT_PLAN_ID);
-    await loadState(DEFAULT_PLAN_ID);
+  async function handleDeletePlanById(planIdToDelete: string) {
+    setPlanManageError('');
+    setDeletingPlanId(planIdToDelete);
+    try {
+      const res = await fetch('/api/plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ action: 'delete', plan_id: planIdToDelete }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPlanManageError(data.error || 'Não foi possível excluir este estudo.');
+        return;
+      }
+      const nextId = activePlanId === planIdToDelete ? (data.fallbackPlanId || DEFAULT_PLAN_ID) : activePlanId;
+      setActivePlanId(nextId);
+      localStorage.setItem('pierre_active_plan', nextId);
+      await loadState(nextId);
+    } catch {
+      setPlanManageError('Erro de conexão ao excluir estudo.');
+    } finally {
+      setDeletingPlanId(null);
+    }
   }
 
   async function topicAction(payload: Record<string, unknown>) {
@@ -283,7 +304,7 @@ export default function HomePage() {
 
   async function sendMessage(
     overrideText?: string,
-    fileObj?: { name: string; base64: string; mimeType: string }
+    fileObj?: { name: string; extractedText?: string; base64?: string; mimeType: string }
   ) {
     const text = (overrideText ?? chatInput).trim();
     if ((!text && !fileObj) || chatBusy) return;
@@ -303,6 +324,7 @@ export default function HomePage() {
         body: JSON.stringify({
           plan_id: activePlanId,
           message: text,
+          extractedText: fileObj?.extractedText || '',
           fileBase64: fileObj?.base64 || '',
           fileName: fileObj?.name || '',
           mimeType: fileObj?.mimeType || '',
@@ -487,6 +509,7 @@ export default function HomePage() {
                   </option>
                 ))}
                 <option value="__new__">+ Novo estudo...</option>
+                <option value="__manage__">Gerenciar / excluir estudos...</option>
               </select>
 
               <button
@@ -497,12 +520,15 @@ export default function HomePage() {
                 <Icons.Plus size={13} /> <span>Novo estudo</span>
               </button>
 
-              {activePlan && activePlan.id !== DEFAULT_PLAN_ID && (
+              {plans.length > 1 && (
                 <button
-                  onClick={handleDeleteCurrentPlan}
-                  className="ds-icon-btn hide-mobile"
-                  title="Remover este estudo"
-                  aria-label="Remover estudo"
+                  onClick={() => {
+                    setPlanManageError('');
+                    setShowManagePlansModal(true);
+                  }}
+                  className="ds-icon-btn"
+                  title="Gerenciar ou excluir estudos"
+                  aria-label="Gerenciar ou excluir estudos"
                 >
                   <Icons.Trash size={14} />
                 </button>
@@ -883,6 +909,98 @@ export default function HomePage() {
             </div>
             <div className="ds-modal-footer">
               <button onClick={() => setShowInstallModal(false)} className="ds-btn ds-btn-primary">Entendi</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MANAGE / DELETE STUDIES MODAL (DESKTOP & MOBILE) */}
+      {showManagePlansModal && (
+        <div className="ds-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setShowManagePlansModal(false); }}>
+          <div className="ds-modal" style={{ maxWidth: 480 }} role="dialog" aria-modal="true" aria-label="Gerenciar estudos">
+            <div className="ds-modal-header">
+              <div>
+                <h2 className="ds-modal-title">Meus estudos ({plans.length})</h2>
+                <div className="text-xs muted">Alterne, crie ou exclua estudos lançados</div>
+              </div>
+              <button onClick={() => setShowManagePlansModal(false)} className="ds-icon-btn" aria-label="Fechar"><Icons.Close /></button>
+            </div>
+            <div className="ds-modal-body space-y">
+              {planManageError && <div className="inline-alert error">{planManageError}</div>}
+
+              <div className="space-y-sm">
+                {plans.map(p => {
+                  const isActive = p.id === activePlanId;
+                  const isProtected = p.id === DEFAULT_PLAN_ID;
+                  const isDeleting = deletingPlanId === p.id;
+                  return (
+                    <div
+                      key={p.id}
+                      className="ds-card"
+                      style={{
+                        padding: '12px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                        borderColor: isActive ? 'var(--c-text)' : 'var(--c-border)',
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="flex-row" style={{ gap: 6 }}>
+                          <strong className="text-sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.title}
+                          </strong>
+                          {isActive && <span className="ds-badge ds-badge-green">Ativo</span>}
+                        </div>
+                        <div className="text-xs muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                          {p.subtitle || p.syllabus_label}
+                        </div>
+                      </div>
+
+                      <div className="flex-row" style={{ flexShrink: 0, gap: 6 }}>
+                        {!isActive && (
+                          <button
+                            onClick={async () => {
+                              setShowManagePlansModal(false);
+                              await handleSwitchPlan(p.id);
+                            }}
+                            className="ds-btn ds-btn-secondary ds-btn-sm"
+                          >
+                            Abrir
+                          </button>
+                        )}
+                        {!isProtected ? (
+                          <button
+                            disabled={Boolean(deletingPlanId)}
+                            onClick={() => handleDeletePlanById(p.id)}
+                            className="ds-btn ds-btn-secondary ds-btn-sm"
+                            style={{ color: 'var(--c-error)', borderColor: 'var(--c-error-soft)' }}
+                          >
+                            <Icons.Trash size={13} /> {isDeleting ? 'Excluindo...' : 'Excluir'}
+                          </button>
+                        ) : (
+                          <span className="ds-badge ds-badge-neutral">Base</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="ds-modal-footer">
+              <button
+                onClick={() => {
+                  setShowManagePlansModal(false);
+                  setShowNewStudySetup(true);
+                }}
+                className="ds-btn ds-btn-secondary"
+              >
+                <Icons.Plus size={14} /> Novo estudo
+              </button>
+              <button onClick={() => setShowManagePlansModal(false)} className="ds-btn ds-btn-primary">
+                Fechar
+              </button>
             </div>
           </div>
         </div>

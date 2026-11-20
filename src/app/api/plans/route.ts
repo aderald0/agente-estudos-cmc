@@ -2,9 +2,20 @@ import { NextResponse } from 'next/server';
 import { getCurrentSession, verifySameOrigin } from '../../../lib/auth';
 import { DEFAULT_PLAN_ID, ensureSchema, getSql, todayISO } from '../../../lib/db';
 
+export const maxDuration = 60;
+
+interface IncomingDoc {
+  name: string;
+  pageCount?: number;
+  extractedText?: string;
+  fallbackBase64?: string;
+  mimeType?: string;
+}
+
 interface ExtractedPlanPayload {
   ready: boolean;
   reply: string;
+  quick_options?: string[];
   plan?: {
     title: string;
     subtitle: string;
@@ -37,12 +48,20 @@ export async function POST(req: Request) {
     const body = await req.json();
     const action = String(body.action || 'analyze');
 
-    // Delete a custom study plan
+    // Delete any custom study plan (cannot delete the last remaining plan)
     if (action === 'delete') {
       const planId = String(body.plan_id || '');
-      if (!planId || planId === DEFAULT_PLAN_ID) {
-        return NextResponse.json({ error: 'O plano padrão não pode ser removido.' }, { status: 400 });
+      if (!planId) {
+        return NextResponse.json({ error: 'Informe o estudo a ser excluído.' }, { status: 400 });
       }
+      const allPlans = await sql`SELECT id FROM study_plans ORDER BY created_at ASC`;
+      if (allPlans.length <= 1) {
+        return NextResponse.json({ error: 'Você precisa manter pelo menos 1 estudo ativo no painel.' }, { status: 400 });
+      }
+      if (planId === DEFAULT_PLAN_ID) {
+        return NextResponse.json({ error: 'O estudo base Câmara de Cuiabá 2026 é protegido contra exclusão acidental.' }, { status: 400 });
+      }
+
       await Promise.all([
         sql`DELETE FROM topics WHERE plan_id = ${planId}`,
         sql`DELETE FROM study_logs WHERE plan_id = ${planId}`,
@@ -53,7 +72,9 @@ export async function POST(req: Request) {
         sql`DELETE FROM flashcards WHERE plan_id = ${planId}`,
         sql`DELETE FROM study_plans WHERE id = ${planId}`,
       ]);
-      return NextResponse.json({ ok: true });
+
+      const remaining = await sql`SELECT id FROM study_plans ORDER BY created_at ASC LIMIT 1`;
+      return NextResponse.json({ ok: true, fallbackPlanId: remaining[0]?.id || DEFAULT_PLAN_ID });
     }
 
     // Save a prepared study plan directly into Neon Postgres
@@ -87,13 +108,24 @@ export async function POST(req: Request) {
         )
       `;
 
+      // Count ALL unique subjects across the entire plan
+      const allUniqueSubjects = new Set<string>();
+      draft.topics.forEach(t => allUniqueSubjects.add(String(t.subject || p.title)));
+
       // Pick up to 3 high-priority topics across different subjects for Today's initial schedule
       const initialTodayIndices = new Set<number>();
-      const seenSubjects = new Set<string>();
+      const pickedSubjects = new Set<string>();
       for (let i = 0; i < draft.topics.length && initialTodayIndices.size < 3; i++) {
         const sub = String(draft.topics[i].subject || '');
-        if (!seenSubjects.has(sub)) {
-          seenSubjects.add(sub);
+        if (!pickedSubjects.has(sub) && draft.topics[i].priority === 'alta') {
+          pickedSubjects.add(sub);
+          initialTodayIndices.add(i);
+        }
+      }
+      for (let i = 0; i < draft.topics.length && initialTodayIndices.size < 3; i++) {
+        const sub = String(draft.topics[i].subject || '');
+        if (!pickedSubjects.has(sub)) {
+          pickedSubjects.add(sub);
           initialTodayIndices.add(i);
         }
       }
@@ -175,119 +207,115 @@ export async function POST(req: Request) {
         VALUES (
           ${planId},
           'assistant',
-          ${`Plano de ${p.title} criado com ${draft.topics.length} tópicos em ${seenSubjects.size} disciplinas! Já separei seus primeiros blocos na tela Hoje.`}
+          ${`Plano de ${p.title} criado com ${draft.topics.length} tópicos em ${allUniqueSubjects.size} disciplinas! Já separei seus primeiros blocos na tela Hoje.`}
         )
       `;
 
       return NextResponse.json({ ok: true, planId });
     }
 
-    // Default action: 'analyze' — Multimodal PDF & Conversational Onboarding with Gemini
+    // Default action: 'analyze' — 2-Phase Intelligent Interview + Full Syllabus Extraction
     const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
       return NextResponse.json({ error: 'GEMINI_API_KEY não configurada na Vercel.' }, { status: 400 });
     }
 
     const messages = Array.isArray(body.messages) ? body.messages : [];
-    const fileBase64 = typeof body.fileBase64 === 'string' ? body.fileBase64 : '';
-    const fileName = typeof body.fileName === 'string' ? body.fileName : '';
-    const mimeType = typeof body.mimeType === 'string' ? body.mimeType : 'application/pdf';
+    const documents: IncomingDoc[] = Array.isArray(body.documents) ? body.documents : [];
 
-    const systemInstruction = `Você é o assistente especialista em análise de editais, ementas universitárias e materiais de estudo do aplicativo Pierre.
-
-ATENÇÃO MÁXIMA PARA EDITAIS LONGOS (ex: 50 a 150 páginas, como SEMA, Tribunais, Polícia, Prefeituras):
-1. Quando o usuário enviar um PDF de Edital de Concurso Público:
-   - Navegue até o **Quadro de Provas / Disciplinas** e até o **Anexo de Conteúdo Programático** (que geralmente fica nas páginas finais do PDF).
-   - Se o edital tiver **múltiplos cargos ou perfis** (ex: Analista Meio Ambiente Perfil 1, Perfil 2, Técnico, etc.) e o usuário AINDA NÃO tiver informado na mensagem qual cargo/perfil vai prestar:
-     - Verifique se é possível identificar os cargos disponíveis.
-     - Se o usuário NÃO especificou o cargo, você pode:
-       a) Ou definir "ready": false e perguntar em "reply" para qual dos cargos/perfis do edital (liste os cargos encontrados no PDF!) ele vai estudar, para que você extraia as disciplinas exatas daquele cargo;
-       b) Ou, se ele já informou o cargo (ou pediu para extrair um cargo específico), defina "ready": true e extraia **100% DAS DISCIPLINAS daquele cargo**.
-2. REGRA DE OURO DA EXTRAÇÃO ("topics") — PROIBIDO OMITIR DISCIPLINAS:
-   - NUNCA omita nenhuma disciplina do cargo escolhido!
-   - Você DEVE incluir **TODAS as disciplinas** de Conhecimentos Básicos, Conhecimentos Gerais e Conhecimentos Específicos previstas no Quadro de Provas daquele cargo (ex: Língua Portuguesa, Raciocínio Lógico, História e Geografia de MT, Noções de Informática, Ética e Filosofia, Direito Constitucional, Direito Administrativo, Legislação Específica/Ambiental e cada matéria do bloco específico).
-   - Para CADA disciplina do cargo, crie todos os tópicos/capítulos necessários cobrindo integralmente o Anexo de Conteúdo Programático daquela matéria (gere quantos tópicos forem necessários: 30, 50, 70 ou 90+ tópicos no array "topics", sem limite artificial!).
-   - Use o nome exato da disciplina no campo "subject" e o assunto detalhado no campo "title".
-   - Defina "priority": "alta" para as disciplinas de maior peso/número de questões (especialmente Conhecimentos Específicos e Legislação) e "media" para as demais.
-3. Adaptação Orgânica por Modalidade:
-   - Matéria de faculdade: category = "faculdade", syllabus_label = "Ementa", has_essay = false.
-   - Concurso público SEM discursiva/redação: category = "concurso", syllabus_label = "Edital", has_essay = false.
-   - Concurso público COM prova discursiva/redação prevista no edital: category = "concurso", syllabus_label = "Edital", has_essay = true.
-   - Cursinho / Certificação: category = "cursinho", syllabus_label = "Módulos", has_essay = false.
-4. Gere também de 6 a 10 questões práticas ("questions") distribuídas entre as disciplinas extraídas e 6 a 10 cartões de memória ("flashcards") com prazos, conceitos ou regras importantes do documento.
-5. Em "reply", liste claramente todas as disciplinas que você encontrou e extraiu (com a quantidade de tópicos de cada uma) e pergunte ao usuário se o cargo/disciplinas estão completos ou se ele quer ajustar o cargo antes de abrir o painel.
-
-Retorne EXCLUSIVAMENTE um objeto JSON válido com este formato:
-{
-  "ready": true,
-  "reply": "Analisei o edital completo para o cargo X. Extraí todas as N disciplinas do conteúdo programático (lista das disciplinas)...",
-  "plan": {
-    "title": "Nome do estudo e cargo (ex: SEMA-MT · Analista Ambiental)",
-    "subtitle": "Banca + Resumo das provas e pesos",
-    "category": "concurso",
-    "syllabus_label": "Edital",
-    "has_essay": true,
-    "target_date": "YYYY-MM-DD ou vazio",
-    "daily_hours": "2h por dia",
-    "hero_title": "Frase curta motivadora para o painel Hoje",
-    "context_cards": [
-      { "tag": "ESP", "title": "Conhecimentos Específicos", "sub": "Resumo de questões e peso", "pill": "Prioridade" },
-      { "tag": "BAS", "title": "Conhecimentos Básicos/Gerais", "sub": "Disciplinas comuns do edital", "pill": "Base" },
-      { "tag": "PROVA", "title": "Avaliação & Data", "sub": "Resumo da prova/discursiva", "pill": "Meta" }
-    ]
-  },
-  "topics": [
-    { "subject": "Nome da Disciplina 1", "title": "1. Tópico completo do conteúdo programático", "priority": "alta" }
-  ],
-  "questions": [
-    {
-      "subject": "Nome da Disciplina",
-      "stem": "Enunciado completo...",
-      "options": [
-        { "letter": "A", "text": "..." },
-        { "letter": "B", "text": "..." },
-        { "letter": "C", "text": "..." },
-        { "letter": "D", "text": "..." }
-      ],
-      "answer": "B"
+    // Backward-compatible single file support
+    if (documents.length === 0 && (body.fileBase64 || body.extractedText)) {
+      documents.push({
+        name: String(body.fileName || 'documento.pdf'),
+        extractedText: typeof body.extractedText === 'string' ? body.extractedText : '',
+        fallbackBase64: typeof body.fileBase64 === 'string' ? body.fileBase64 : '',
+        mimeType: typeof body.mimeType === 'string' ? body.mimeType : 'application/pdf',
+      });
     }
-  ],
-  "flashcards": [
-    { "subject": "Nome da Disciplina", "front": "Pergunta direta?", "back": "Resposta objetiva.", "tag": "Edital" }
-  ]
-}`;
 
-    // Attach the PDF to the latest turn that has fileBase64 so follow-up messages ("Mude para o cargo X" or "Inclua todas as disciplinas") still see the PDF
-    const contents = messages.map((m: { role: string; text: string }, idx: number) => {
-      const isLast = idx === messages.length - 1;
-      if (isLast && fileBase64) {
-        return {
-          role: 'user',
-          parts: [
-            { inlineData: { mimeType, data: fileBase64 } },
-            {
-              text:
-                m.text ||
-                `Analise o documento anexado (${fileName}). Se for um edital com vários cargos e eu não especifiquei o cargo, me pergunte qual cargo vou fazer listando as opções encontradas, ou extraia 100% de todas as disciplinas (Básicos, Gerais e Específicos) sem omitir nenhuma matéria.`,
-            },
-          ],
-        };
+    const systemInstruction = `Você é um mentor especialista em análise de editais de concursos públicos, ementas universitárias e planos de estudo no aplicativo Pierre.
+
+VOCÊ OPERA EM 2 FASES CLARAS E OBRIGATÓRIAS:
+
+=== FASE 1: ENTREVISTA E DIAGNÓSTICO (ready: false) ===
+Quando o usuário envia um documento (Edital, Ementa, Apostila) pela PRIMEIRA vez na conversa, você DEVE ler o documento inteiro com atenção e ANTES de montar o plano final, verificar o que falta saber:
+1. Se o documento for um **Edital de Concurso Público com múltiplos cargos, áreas ou perfis** e o usuário AINDA NÃO especificou exatamente qual cargo/perfil vai prestar:
+   - OBRIGATORIAMENTE retorne "ready": false.
+   - Em "reply":
+     a) Confirme que leu o edital (cite o órgão, a banca, a data da prova se constar, e se há prova discursiva/títulos);
+     b) Liste os **cargos/perfis reais** que você encontrou no edital;
+     c) Faça 2 ou 3 perguntas curtas e objetivas para montar um plano perfeito:
+        - Para qual **cargo/perfil** você vai prestar?
+        - Quantas **horas por dia** você tem disponível e qual seu **nível atual** nessas matérias?
+        - Você já tem **materiais/apostilas/cursinho** ou vai montar sua base do zero?
+   - Em "quick_options": coloque de 3 a 8 strings curtas com os nomes EXATOS dos principais cargos/perfis encontrados no PDF para o usuário poder clicar com 1 toque!
+2. Se o documento for de **cargo único, matéria de faculdade ou cursinho**, mas o usuário ainda não informou **quantas horas por dia tem disponível** nem **se já tem material/nível**:
+   - Retorne "ready": false, resuma brevemente o que encontrou no PDF (matéria, provas/unidades) e pergunte sua carga horária diária e nível atual, oferecendo 3 opções clicáveis em "quick_options" (ex: ["1h/dia · Começando do zero", "2h/dia · Já tenho base", "3h/dia · Reta final"]).
+
+=== FASE 2: EXTRAÇÃO 100% COMPLETA DO PLANO (ready: true) ===
+Assim que o usuário responder qual cargo/perfil vai prestar (e sua rotina/nível, ou se ele já tiver informado tudo na primeira mensagem, ou pedir explicitamente "pode gerar agora"):
+- Retorne "ready": true com a estrutura COMPLETA do plano.
+- **REGRA DE OURO DA EXTRAÇÃO ("topics") — ZERO OMISSÃO DE DISCIPLINAS:**
+  - Localize no texto do documento o **Quadro de Provas / Disciplinas** e o **Anexo de Conteúdo Programático** específicos do cargo escolhido.
+  - Extraia **100% DE TODAS AS DISCIPLINAS** previstas para aquele cargo (Conhecimentos Básicos, Conhecimentos Gerais, Legislação, Conhecimentos Específicos — absolutamente TODAS, sem pular nenhuma!).
+  - Para CADA disciplina, quebre o conteúdo programático em tópicos claros e estudáveis (pode gerar 30, 50, 80 ou 100+ tópicos no array "topics", sem limite artificial!).
+  - NUNCA remova disciplinas que o usuário já tem ou que estão no edital.
+  - Use o nome exato da disciplina em "subject" e o título claro do tópico em "title".
+  - Marque "priority": "alta" para as matérias de maior peso/quantidade de questões e "media" para as demais.
+- **Adaptação Orgânica Realista:**
+  - Faculdade: category = "faculdade", syllabus_label = "Ementa", has_essay = false (a menos que a ementa exija redação).
+  - Concurso SEM discursiva: category = "concurso", syllabus_label = "Edital", has_essay = false.
+  - Concurso COM discursiva/redação: category = "concurso", syllabus_label = "Edital", has_essay = true.
+  - Cursinho / Certificação: category = "cursinho", syllabus_label = "Módulos", has_essay = false.
+- Gere de 6 a 10 questões práticas ("questions") e 6 a 10 cartões de memória ("flashcards") distribuídos pelas disciplinas principais.
+- Em "reply", faça um resumo limpo das disciplinas extraídas (com o peso/quantidade de tópicos de cada uma) e convide o usuário a conferir e confirmar, ou pedir qualquer ajuste antes de abrir o painel.
+
+Retorne EXCLUSIVAMENTE um JSON válido neste formato:
+{
+  "ready": false,
+  "reply": "Li o Edital completo da SEMA-MT (82 páginas, banca X, prova em DD/MM/AAAA)...",
+  "quick_options": ["Cargo A", "Cargo B", "Cargo C"],
+  "plan": null,
+  "topics": [],
+  "questions": [],
+  "flashcards": []
+}
+(Quando "ready": true, preencha "plan", "topics", "questions" e "flashcards" completamente.)`;
+
+    // Build Gemini contents: inject ALL attached documents (full text or scanned fallback) cleanly on the first user turn
+    const docParts: Array<Record<string, unknown>> = [];
+    for (const doc of documents) {
+      if (doc.extractedText && doc.extractedText.trim().length > 0) {
+        docParts.push({
+          text: `=== DOCUMENTO ANEXADO: ${doc.name} (${doc.pageCount || '?'} páginas) ===\n${doc.extractedText}\n=== FIM DO DOCUMENTO: ${doc.name} ===`,
+        });
+      } else if (doc.fallbackBase64) {
+        docParts.push({
+          inlineData: { mimeType: doc.mimeType || 'application/pdf', data: doc.fallbackBase64 },
+        });
       }
-      return {
-        role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: String(m.text || '') }],
-      };
-    });
+    }
 
-    if (contents.length === 0 && fileBase64) {
+    const contents: Array<{ role: string; parts: Array<Record<string, unknown>> }> = [];
+
+    if (docParts.length > 0) {
       contents.push({
         role: 'user',
         parts: [
-          { inlineData: { mimeType, data: fileBase64 } },
-          {
-            text: `Analise o arquivo anexado (${fileName}) e extraia todas as disciplinas e tópicos do conteúdo programático.`,
-          },
+          ...docParts,
+          { text: 'Estes são os documentos que enviei para basear meu plano de estudos. Leia todos com atenção antes de responder às minhas mensagens abaixo.' },
         ],
+      });
+      contents.push({
+        role: 'model',
+        parts: [{ text: JSON.stringify({ ready: false, reply: 'Documentos recebidos e lidos na íntegra. Pronto para analisar suas mensagens.' }) }],
+      });
+    }
+
+    for (const m of messages) {
+      contents.push({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: [{ text: String(m.text || '') }],
       });
     }
 
@@ -318,7 +346,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido com este formato:
     }
 
     if (!res || !res.ok) {
-      throw new Error(`Gemini API HTTP ${res?.status || 500}: ${errTxt.slice(0, 240)}`);
+      throw new Error(`Gemini API HTTP ${res?.status || 500}: ${errTxt.slice(0, 260)}`);
     }
 
     const data = await res.json();
@@ -336,7 +364,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido com este formato:
     } catch {
       parsed = {
         ready: false,
-        reply: rawJson || 'Para qual cargo ou perfil deste edital você vai estudar? Me informe o cargo para eu extrair todas as disciplinas exatas dele.',
+        reply: rawJson || 'Para qual cargo ou área deste documento você vai estudar? Me diga também quantas horas por dia tem disponível.',
       };
     }
 

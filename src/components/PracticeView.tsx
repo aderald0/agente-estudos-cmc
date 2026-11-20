@@ -49,8 +49,14 @@ export function PracticeView({
   useEffect(() => {
     setSelectedSubject(isCmcPlan ? 'Legislação Municipal' : 'all');
     setFcSubject('all');
-    setNewFcSub(availableSubjects[0] || 'Geral');
-  }, [activePlan?.id, isCmcPlan, availableSubjects]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePlan?.id, isCmcPlan]);
+
+  useEffect(() => {
+    if (availableSubjects.length > 0 && !availableSubjects.includes(newFcSub)) {
+      setNewFcSub(availableSubjects[0]);
+    }
+  }, [availableSubjects, newFcSub]);
 
   const filteredQuestions = useMemo(() => {
     return questions.filter(q => {
