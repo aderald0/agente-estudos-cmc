@@ -62,6 +62,7 @@ export function NewStudyView({
   const [latestDraft, setLatestDraft] = useState<DraftPlanData | null>(null);
   const [expandedDraftId, setExpandedDraftId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [lastFailedText, setLastFailedText] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -69,9 +70,36 @@ export function NewStudyView({
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, busy, parsingPdf]);
 
+  async function safeParseJson(res: Response): Promise<{ ok: boolean; data: Record<string, unknown> | null; errorMsg: string }> {
+    const rawText = await res.text();
+    let parsed: Record<string, unknown> | null = null;
+    try {
+      parsed = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : null;
+    } catch {
+      parsed = null;
+    }
+    if (res.ok && parsed) {
+      return { ok: true, data: parsed, errorMsg: '' };
+    }
+    if (res.status === 504 || res.status === 502) {
+      return {
+        ok: false,
+        data: null,
+        errorMsg: 'A leitura do documento grande excedeu o tempo limite do servidor. Clique em "Tentar novamente" — seus arquivos continuam anexados.',
+      };
+    }
+    const serverErr = parsed && typeof parsed.error === 'string' ? parsed.error : '';
+    return {
+      ok: false,
+      data: parsed,
+      errorMsg: serverErr || `Erro ao processar requisição (HTTP ${res.status}). Tente novamente.`,
+    };
+  }
+
   async function handleFileSelect(files: FileList | null) {
     if (!files || files.length === 0) return;
     setError('');
+    setLastFailedText(null);
     setParsingPdf(true);
 
     try {
@@ -101,7 +129,8 @@ export function NewStudyView({
   async function sendToAgent(
     overrideText?: string,
     overrideDocs?: ParsedDocument[],
-    newFileNames?: string[]
+    newFileNames?: string[],
+    isRetry = false
   ) {
     const text = (overrideText ?? input).trim();
     const docsToSend = overrideDocs ?? attachedDocs;
@@ -109,16 +138,23 @@ export function NewStudyView({
 
     if (!overrideText) setInput('');
     setError('');
+    setLastFailedText(null);
 
-    const userMsg: SetupMsg = {
-      id: Date.now(),
-      role: 'user',
-      text,
-      fileNames: newFileNames,
-    };
+    const nextHistory = isRetry
+      ? messages
+      : [
+          ...messages,
+          {
+            id: Date.now(),
+            role: 'user' as const,
+            text,
+            fileNames: newFileNames,
+          },
+        ];
 
-    const nextHistory = [...messages, userMsg];
-    setMessages(nextHistory);
+    if (!isRetry) {
+      setMessages(nextHistory);
+    }
     setBusy(true);
 
     try {
@@ -132,13 +168,14 @@ export function NewStudyView({
           documents: docsToSend,
         }),
       });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error || 'Não foi possível analisar o documento agora.');
+      const parsed = await safeParseJson(res);
+      if (!parsed.ok || !parsed.data) {
+        setError(parsed.errorMsg);
+        setLastFailedText(text);
         return;
       }
 
-      const data = json.data as DraftPlanData;
+      const data = parsed.data.data as DraftPlanData;
       if (data?.ready && data?.plan) {
         setLatestDraft(data);
       }
@@ -156,6 +193,7 @@ export function NewStudyView({
       inputRef.current?.focus();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro de conexão.');
+      setLastFailedText(text);
     } finally {
       setBusy(false);
     }
@@ -176,13 +214,13 @@ export function NewStudyView({
           draft: target,
         }),
       });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error || 'Erro ao salvar plano no banco.');
+      const parsed = await safeParseJson(res);
+      if (!parsed.ok || !parsed.data) {
+        setError(parsed.errorMsg || 'Erro ao salvar plano no banco.');
         setSaving(false);
         return;
       }
-      await onPlanCreated(json.planId);
+      await onPlanCreated(String(parsed.data.planId || ''));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro de rede.');
       setSaving(false);
@@ -248,10 +286,20 @@ export function NewStudyView({
           const subjectEntries = Array.from(subjectMap.entries());
           const isExpanded = expandedDraftId === m.id;
 
+          const formattedParts = m.text.split(/(\*\*[^*]+\*\*)/g);
+
           return (
             <div key={m.id} style={{ display: 'flex', justifyContent: 'flex-start' }}>
               <div className="mentor-msg-assistant" style={{ maxWidth: '94%', padding: '16px 20px' }}>
-                <div style={{ whiteSpace: 'pre-line', lineHeight: 1.6, fontSize: 14 }}>{m.text}</div>
+                <div style={{ whiteSpace: 'pre-line', lineHeight: 1.6, fontSize: 14 }}>
+                  {formattedParts.map((part, pIdx) =>
+                    part.startsWith('**') && part.endsWith('**') ? (
+                      <strong key={pIdx}>{part.slice(2, -2)}</strong>
+                    ) : (
+                      <React.Fragment key={pIdx}>{part}</React.Fragment>
+                    )
+                  )}
+                </div>
 
                 {/* Clickable Interview Options (e.g., exact Cargos extracted from the Edital PDF) */}
                 {isLatestMsg && !busy && m.quickOptions && m.quickOptions.length > 0 && !m.draft?.plan && (
@@ -386,7 +434,21 @@ export function NewStudyView({
           </div>
         )}
 
-        {error && <div className="inline-alert error">{error}</div>}
+        {error && (
+          <div className="inline-alert error flex-row" style={{ justifyContent: 'space-between', gap: 10 }}>
+            <span>{error}</span>
+            {lastFailedText && !busy && (
+              <button
+                type="button"
+                onClick={() => sendToAgent(lastFailedText, attachedDocs, undefined, true)}
+                className="ds-btn ds-btn-secondary ds-btn-sm"
+                style={{ flexShrink: 0 }}
+              >
+                Tentar novamente
+              </button>
+            )}
+          </div>
+        )}
         <div ref={endRef} />
       </div>
 

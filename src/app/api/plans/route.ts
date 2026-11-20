@@ -37,6 +37,125 @@ interface ExtractedPlanPayload {
   flashcards?: Array<{ subject: string; front: string; back: string; tag: string }>;
 }
 
+function normalizeStr(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+/**
+ * Smart page-level distiller for huge multi-page Editais (60-200 pages).
+ * Keeps 100% of high-value pages (first pages, cargos, quadro de provas, conhecimentos básicos/gerais,
+ * and all pages matching the user's chosen cargo/profile) while dropping boilerplate forms/declarations
+ * so Gemini responds in ~8-15s instead of hitting Vercel's 60s timeout.
+ */
+function distillDocumentText(fullText: string, userContextText: string, maxChars = 140_000): string {
+  if (fullText.length <= maxChars) return fullText;
+
+  const pages = fullText.split(/(?=\[PÁGINA \d+\/\d+\])/g).filter(Boolean);
+  if (pages.length <= 1) {
+    return fullText.slice(0, maxChars);
+  }
+
+  // Extract meaningful search terms from user's conversation (e.g., cargo name "analista em ti", "desenvolvimento")
+  const stopWords = new Set([
+    'para', 'qual', 'cargo', 'perfil', 'concurso', 'edital', 'estudar', 'plano', 'estudos',
+    'horas', 'nivel', 'material', 'anexei', 'paginas', 'analise', 'documento', 'perguntas',
+    'montar', 'quero', 'fazer', 'sobre', 'como', 'mais', 'menos', 'com', 'sem', 'por', 'que',
+  ]);
+  const userTerms = Array.from(
+    new Set(
+      normalizeStr(userContextText)
+        .split(/[^a-z0-9]+/)
+        .filter(w => w.length >= 2 && !stopWords.has(w))
+    )
+  );
+
+  const highValueKeywords = [
+    'conteudo programatico',
+    'conhecimentos basicos',
+    'conhecimentos gerais',
+    'conhecimentos especificos',
+    'quadro de provas',
+    'prova objetiva',
+    'prova discursiva',
+    'redacao',
+    'disciplina',
+    'cargos',
+    'vagas',
+    'remuneracao',
+    'cronograma',
+    'ementa',
+    'unidades',
+    'anexo',
+  ];
+
+  const scored = pages.map((pageText, idx) => {
+    const norm = normalizeStr(pageText);
+    let score = 0;
+
+    // Always prioritize opening pages (organ, banca, cargos, rules)
+    if (idx < 6) score += 50;
+
+    // Match user-specified cargo / profile terms strongly
+    let userHits = 0;
+    for (const term of userTerms) {
+      if (norm.includes(term)) userHits++;
+    }
+    if (userHits > 0) score += 40 + userHits * 15;
+
+    // Match syllabus & exam structure pages
+    for (const kw of highValueKeywords) {
+      if (norm.includes(kw)) score += 12;
+    }
+
+    // Penalize pure boilerplate annexes (declaração, formulário, cronograma de entrega, laudo médico)
+    if (
+      (norm.includes('autodeclaracao') ||
+        norm.includes('laudo medico') ||
+        norm.includes('requerimento de isencao') ||
+        norm.includes('formulario de recurso')) &&
+      userHits === 0
+    ) {
+      score -= 30;
+    }
+
+    return { idx, pageText, score };
+  });
+
+  // Sort by score desc, pick top pages up to maxChars, then restore original page order
+  const selectedIndices = new Set<number>();
+  let totalChars = 0;
+  const byScore = [...scored].sort((a, b) => b.score - a.score || a.idx - b.idx);
+
+  for (const item of byScore) {
+    if (totalChars + item.pageText.length > maxChars && selectedIndices.size >= 8) continue;
+    selectedIndices.add(item.idx);
+    totalChars += item.pageText.length;
+    if (totalChars >= maxChars) break;
+  }
+
+  // Also pull in +1 neighbor page after strong syllabus matches (continuations of a cargo's syllabus)
+  const extraNeighbors: number[] = [];
+  for (const item of scored) {
+    if (selectedIndices.has(item.idx) && item.score >= 55 && item.idx + 1 < pages.length && !selectedIndices.has(item.idx + 1)) {
+      extraNeighbors.push(item.idx + 1);
+    }
+  }
+  for (const nIdx of extraNeighbors) {
+    if (totalChars + pages[nIdx].length <= maxChars + 25_000) {
+      selectedIndices.add(nIdx);
+      totalChars += pages[nIdx].length;
+    }
+  }
+
+  return scored
+    .filter(s => selectedIndices.has(s.idx))
+    .map(s => s.pageText)
+    .join('\n\n');
+}
+
 export async function POST(req: Request) {
   if (!verifySameOrigin(req)) return NextResponse.json({ error: 'Origem não autorizada' }, { status: 403 });
   const session = await getCurrentSession();
@@ -77,7 +196,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, fallbackPlanId: remaining[0]?.id || DEFAULT_PLAN_ID });
     }
 
-    // Save a prepared study plan directly into Neon Postgres
+    // Save a prepared study plan directly into Neon Postgres (parallel chunked inserts for speed)
     if (action === 'create') {
       const draft = body.draft as ExtractedPlanPayload;
       if (!draft?.plan || !Array.isArray(draft.topics) || draft.topics.length === 0) {
@@ -133,88 +252,99 @@ export async function POST(req: Request) {
         initialTodayIndices.add(i);
       }
 
-      for (let i = 0; i < draft.topics.length; i++) {
-        const t = draft.topics[i];
-        const tid = `${planId}-t-${i + 1}`;
-        const inTodayQueue = initialTodayIndices.has(i);
-        const pri = t.priority === 'alta' || t.priority === 'media' || t.priority === 'baixa' ? t.priority : (inTodayQueue ? 'alta' : 'media');
-        await sql`
-          INSERT INTO topics (id, plan_id, subject, title, overlap, priority, status, study_queue, study_date, sort_order)
-          VALUES (
-            ${tid},
-            ${planId},
-            ${String(t.subject || p.title).slice(0, 120)},
-            ${String(t.title || `Tópico ${i + 1}`).slice(0, 220)},
-            'ambos-identico',
-            ${pri},
-            ${inTodayQueue ? 'estudando' : 'nao-iniciado'},
-            ${inTodayQueue},
-            ${inTodayQueue ? today : ''},
-            ${i}
-          )
-        `;
+      // Insert topics in parallel chunks of 12 to avoid sequential Neon round-trip latency
+      const CHUNK = 12;
+      for (let start = 0; start < draft.topics.length; start += CHUNK) {
+        const slice = draft.topics.slice(start, start + CHUNK);
+        await Promise.all(
+          slice.map((t, offset) => {
+            const i = start + offset;
+            const tid = `${planId}-t-${i + 1}`;
+            const inTodayQueue = initialTodayIndices.has(i);
+            const pri =
+              t.priority === 'alta' || t.priority === 'media' || t.priority === 'baixa'
+                ? t.priority
+                : inTodayQueue
+                  ? 'alta'
+                  : 'media';
+            return sql`
+              INSERT INTO topics (id, plan_id, subject, title, overlap, priority, status, study_queue, study_date, sort_order)
+              VALUES (
+                ${tid},
+                ${planId},
+                ${String(t.subject || p.title).slice(0, 120)},
+                ${String(t.title || `Tópico ${i + 1}`).slice(0, 220)},
+                'ambos-identico',
+                ${pri},
+                ${inTodayQueue ? 'estudando' : 'nao-iniciado'},
+                ${inTodayQueue},
+                ${inTodayQueue ? today : ''},
+                ${i}
+              )
+            `;
+          })
+        );
       }
 
-      // Insert extracted/generated practice questions
+      // Insert practice questions & flashcards in parallel
       const qs = Array.isArray(draft.questions) ? draft.questions : [];
-      for (let i = 0; i < qs.length; i++) {
-        const q = qs[i];
-        const qid = `${planId}-q-${i + 1}`;
-        const opts = Array.isArray(q.options) && q.options.length >= 2
-          ? q.options
-          : [
-              { letter: 'A', text: 'Alternativa A' },
-              { letter: 'B', text: 'Alternativa B' },
-              { letter: 'C', text: 'Alternativa C' },
-              { letter: 'D', text: 'Alternativa D' },
-            ];
-        await sql`
-          INSERT INTO practice_questions (id, plan_id, subject, qnum, stem, options_json, answer)
-          VALUES (
-            ${qid},
-            ${planId},
-            ${String(q.subject || p.title).slice(0, 120)},
-            ${i + 1},
-            ${String(q.stem || '')},
-            ${JSON.stringify(opts)},
-            ${String(q.answer || 'A').toUpperCase().slice(0, 1)}
-          )
-        `;
-      }
-
-      // Insert extracted/generated flashcards
       const fcs = Array.isArray(draft.flashcards) ? draft.flashcards : [];
-      for (let i = 0; i < fcs.length; i++) {
-        const fc = fcs[i];
-        const fcid = `${planId}-fc-${i + 1}`;
-        await sql`
-          INSERT INTO flashcards (id, plan_id, subject, front, back, tag, box, next_review_date)
-          VALUES (
-            ${fcid},
-            ${planId},
-            ${String(fc.subject || p.title).slice(0, 120)},
-            ${String(fc.front || '').slice(0, 500)},
-            ${String(fc.back || '').slice(0, 800)},
-            ${String(fc.tag || 'Conceito').slice(0, 80)},
-            1,
-            ${today}
-          )
-        `;
-      }
 
-      await sql`
-        INSERT INTO chat_messages (plan_id, role, content)
-        VALUES (
-          ${planId},
-          'assistant',
-          ${`Plano de ${p.title} criado com ${draft.topics.length} tópicos em ${allUniqueSubjects.size} disciplinas! Já separei seus primeiros blocos na tela Hoje.`}
-        )
-      `;
+      await Promise.all([
+        ...qs.map((q, i) => {
+          const qid = `${planId}-q-${i + 1}`;
+          const opts =
+            Array.isArray(q.options) && q.options.length >= 2
+              ? q.options
+              : [
+                  { letter: 'A', text: 'Alternativa A' },
+                  { letter: 'B', text: 'Alternativa B' },
+                  { letter: 'C', text: 'Alternativa C' },
+                  { letter: 'D', text: 'Alternativa D' },
+                ];
+          return sql`
+            INSERT INTO practice_questions (id, plan_id, subject, qnum, stem, options_json, answer)
+            VALUES (
+              ${qid},
+              ${planId},
+              ${String(q.subject || p.title).slice(0, 120)},
+              ${i + 1},
+              ${String(q.stem || '')},
+              ${JSON.stringify(opts)},
+              ${String(q.answer || 'A').toUpperCase().slice(0, 1)}
+            )
+          `;
+        }),
+        ...fcs.map((fc, i) => {
+          const fcid = `${planId}-fc-${i + 1}`;
+          return sql`
+            INSERT INTO flashcards (id, plan_id, subject, front, back, tag, box, next_review_date)
+            VALUES (
+              ${fcid},
+              ${planId},
+              ${String(fc.subject || p.title).slice(0, 120)},
+              ${String(fc.front || '').slice(0, 500)},
+              ${String(fc.back || '').slice(0, 800)},
+              ${String(fc.tag || 'Conceito').slice(0, 80)},
+              1,
+              ${today}
+            )
+          `;
+        }),
+        sql`
+          INSERT INTO chat_messages (plan_id, role, content)
+          VALUES (
+            ${planId},
+            'assistant',
+            ${`Plano de ${p.title} criado com ${draft.topics.length} tópicos em ${allUniqueSubjects.size} disciplinas! Já separei seus primeiros blocos na tela Hoje.`}
+          )
+        `,
+      ]);
 
       return NextResponse.json({ ok: true, planId });
     }
 
-    // Default action: 'analyze' — 2-Phase Intelligent Interview + Full Syllabus Extraction
+    // Default action: 'analyze' — 2-Phase Intelligent Interview + Fast Full Syllabus Extraction
     const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
       return NextResponse.json({ error: 'GEMINI_API_KEY não configurada na Vercel.' }, { status: 400 });
@@ -233,48 +363,49 @@ export async function POST(req: Request) {
       });
     }
 
+    // Collect user messages text so our smart distiller prioritizes pages matching the chosen cargo/profile
+    const userContextText = messages
+      .filter((m: Record<string, unknown>) => m.role === 'user')
+      .map((m: Record<string, unknown>) => String(m.text || ''))
+      .join(' ');
+
     const systemInstruction = `Você é um mentor especialista em análise de editais de concursos públicos, ementas universitárias e planos de estudo no aplicativo Pierre.
 
 VOCÊ OPERA EM 2 FASES CLARAS E OBRIGATÓRIAS:
 
 === FASE 1: ENTREVISTA E DIAGNÓSTICO (ready: false) ===
-Quando o usuário envia um documento (Edital, Ementa, Apostila) pela PRIMEIRA vez na conversa, você DEVE ler o documento inteiro com atenção e ANTES de montar o plano final, verificar o que falta saber:
-1. Se o documento for um **Edital de Concurso Público com múltiplos cargos, áreas ou perfis** e o usuário AINDA NÃO especificou exatamente qual cargo/perfil vai prestar:
+Quando o usuário envia um documento (Edital, Ementa, Apostila) pela PRIMEIRA vez na conversa, leia o documento com atenção e ANTES de montar o plano final, verifique o que falta saber:
+1. Se o documento for um Edital de Concurso Público com múltiplos cargos, áreas ou perfis e o usuário AINDA NÃO especificou exatamente qual cargo/perfil vai prestar:
    - OBRIGATORIAMENTE retorne "ready": false.
    - Em "reply":
-     a) Confirme que leu o edital (cite o órgão, a banca, a data da prova se constar, e se há prova discursiva/títulos);
-     b) Liste os **cargos/perfis reais** que você encontrou no edital;
-     c) Faça 2 ou 3 perguntas curtas e objetivas para montar um plano perfeito:
-        - Para qual **cargo/perfil** você vai prestar?
-        - Quantas **horas por dia** você tem disponível e qual seu **nível atual** nessas matérias?
-        - Você já tem **materiais/apostilas/cursinho** ou vai montar sua base do zero?
-   - Em "quick_options": coloque de 3 a 8 strings curtas com os nomes EXATOS dos principais cargos/perfis encontrados no PDF para o usuário poder clicar com 1 toque!
-2. Se o documento for de **cargo único, matéria de faculdade ou cursinho**, mas o usuário ainda não informou **quantas horas por dia tem disponível** nem **se já tem material/nível**:
-   - Retorne "ready": false, resuma brevemente o que encontrou no PDF (matéria, provas/unidades) e pergunte sua carga horária diária e nível atual, oferecendo 3 opções clicáveis em "quick_options" (ex: ["1h/dia · Começando do zero", "2h/dia · Já tenho base", "3h/dia · Reta final"]).
+     a) Confirme que leu o edital (cite órgão, banca, data da prova se constar e se há prova discursiva);
+     b) Liste os cargos/perfis reais encontrados;
+     c) Faça 2 ou 3 perguntas objetivas: qual cargo/perfil vai prestar, quantas horas por dia tem disponível/nível atual, e se já tem material/cursinho.
+   - Em "quick_options": coloque de 3 a 8 strings curtas com os nomes EXATOS dos principais cargos/perfis encontrados no PDF para o usuário clicar com 1 toque.
+2. Se o documento for de cargo único, matéria de faculdade ou cursinho, mas o usuário ainda não informou sua carga horária diária nem nível atual:
+   - Retorne "ready": false, resuma o que encontrou e pergunte rotina/nível, oferecendo 3 opções clicáveis em "quick_options".
 
 === FASE 2: EXTRAÇÃO 100% COMPLETA DO PLANO (ready: true) ===
-Assim que o usuário responder qual cargo/perfil vai prestar (e sua rotina/nível, ou se ele já tiver informado tudo na primeira mensagem, ou pedir explicitamente "pode gerar agora"):
+Assim que o usuário responder qual cargo/perfil vai prestar (ou se já informou tudo na primeira mensagem):
 - Retorne "ready": true com a estrutura COMPLETA do plano.
-- **REGRA DE OURO DA EXTRAÇÃO ("topics") — ZERO OMISSÃO DE DISCIPLINAS:**
-  - Localize no texto do documento o **Quadro de Provas / Disciplinas** e o **Anexo de Conteúdo Programático** específicos do cargo escolhido.
-  - Extraia **100% DE TODAS AS DISCIPLINAS** previstas para aquele cargo (Conhecimentos Básicos, Conhecimentos Gerais, Legislação, Conhecimentos Específicos — absolutamente TODAS, sem pular nenhuma!).
-  - Para CADA disciplina, quebre o conteúdo programático em tópicos claros e estudáveis (pode gerar 30, 50, 80 ou 100+ tópicos no array "topics", sem limite artificial!).
-  - NUNCA remova disciplinas que o usuário já tem ou que estão no edital.
-  - Use o nome exato da disciplina em "subject" e o título claro do tópico em "title".
-  - Marque "priority": "alta" para as matérias de maior peso/quantidade de questões e "media" para as demais.
-- **Adaptação Orgânica Realista:**
-  - Faculdade: category = "faculdade", syllabus_label = "Ementa", has_essay = false (a menos que a ementa exija redação).
+- REGRA DE OURO DA EXTRAÇÃO ("topics") — ZERO OMISSÃO DE DISCIPLINAS:
+  - Localize no texto do documento o Quadro de Provas / Disciplinas e o Anexo de Conteúdo Programático específicos do cargo escolhido.
+  - Extraia 100% DE TODAS AS DISCIPLINAS previstas para aquele cargo (Conhecimentos Básicos, Conhecimentos Gerais, Legislação, Conhecimentos Específicos — absolutamente TODAS, sem pular nenhuma!).
+  - Para CADA disciplina, organize o conteúdo programático em tópicos claros, objetivos e estudáveis (títulos concisos de até 90 caracteres; tipicamente de 3 a 8 tópicos por disciplina, totalizando ~25 a 65 tópicos completos sem omitir nenhuma matéria!).
+  - Use o nome exato da disciplina em "subject" e marque "priority": "alta" para as matérias de maior peso/específicas e "media" para as demais.
+- Adaptação Orgânica Realista:
+  - Faculdade: category = "faculdade", syllabus_label = "Ementa", has_essay = false (salvo se houver redação).
   - Concurso SEM discursiva: category = "concurso", syllabus_label = "Edital", has_essay = false.
   - Concurso COM discursiva/redação: category = "concurso", syllabus_label = "Edital", has_essay = true.
   - Cursinho / Certificação: category = "cursinho", syllabus_label = "Módulos", has_essay = false.
-- Gere de 6 a 10 questões práticas ("questions") e 6 a 10 cartões de memória ("flashcards") distribuídos pelas disciplinas principais.
-- Em "reply", faça um resumo limpo das disciplinas extraídas (com o peso/quantidade de tópicos de cada uma) e convide o usuário a conferir e confirmar, ou pedir qualquer ajuste antes de abrir o painel.
+- Gere um kit inicial enxuto de 4 questões práticas ("questions") e 4 cartões de memória ("flashcards") das disciplinas de maior peso (para manter a resposta rápida).
+- Em "reply", faça um resumo limpo das disciplinas extraídas e convide o usuário a conferir e confirmar.
 
 Retorne EXCLUSIVAMENTE um JSON válido neste formato:
 {
   "ready": false,
-  "reply": "Li o Edital completo da SEMA-MT (82 páginas, banca X, prova em DD/MM/AAAA)...",
-  "quick_options": ["Cargo A", "Cargo B", "Cargo C"],
+  "reply": "Resumo limpo...",
+  "quick_options": ["Cargo A", "Cargo B"],
   "plan": null,
   "topics": [],
   "questions": [],
@@ -282,12 +413,15 @@ Retorne EXCLUSIVAMENTE um JSON válido neste formato:
 }
 (Quando "ready": true, preencha "plan", "topics", "questions" e "flashcards" completamente.)`;
 
-    // Build Gemini contents: inject ALL attached documents (full text or scanned fallback) cleanly on the first user turn
+    // Build Gemini contents with smart distillation for huge multi-page PDFs
     const docParts: Array<Record<string, unknown>> = [];
+    const perDocBudget = documents.length > 1 ? Math.floor(150_000 / documents.length) : 150_000;
+
     for (const doc of documents) {
       if (doc.extractedText && doc.extractedText.trim().length > 0) {
+        const focusedText = distillDocumentText(doc.extractedText, userContextText, perDocBudget);
         docParts.push({
-          text: `=== DOCUMENTO ANEXADO: ${doc.name} (${doc.pageCount || '?'} páginas) ===\n${doc.extractedText}\n=== FIM DO DOCUMENTO: ${doc.name} ===`,
+          text: `=== DOCUMENTO ANEXADO: ${doc.name} (${doc.pageCount || '?'} páginas) ===\n${focusedText}\n=== FIM DO DOCUMENTO: ${doc.name} ===`,
         });
       } else if (doc.fallbackBase64) {
         docParts.push({
@@ -303,12 +437,12 @@ Retorne EXCLUSIVAMENTE um JSON válido neste formato:
         role: 'user',
         parts: [
           ...docParts,
-          { text: 'Estes são os documentos que enviei para basear meu plano de estudos. Leia todos com atenção antes de responder às minhas mensagens abaixo.' },
+          { text: 'Estes são os documentos que enviei para basear meu plano de estudos. Leia com atenção antes de responder às minhas mensagens abaixo.' },
         ],
       });
       contents.push({
         role: 'model',
-        parts: [{ text: JSON.stringify({ ready: false, reply: 'Documentos recebidos e lidos na íntegra. Pronto para analisar suas mensagens.' }) }],
+        parts: [{ text: JSON.stringify({ ready: false, reply: 'Documentos recebidos e analisados. Pronto para responder.' }) }],
       });
     }
 
@@ -327,19 +461,34 @@ Retorne EXCLUSIVAMENTE um JSON válido neste formato:
 
     for (const m of candidateModels) {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-      res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemInstruction }] },
-          contents,
-          generationConfig: {
-            temperature: 0.25,
-            maxOutputTokens: 16384,
-            responseMimeType: 'application/json',
-          },
-        }),
-      });
+
+      // Cap thinkingBudget to 512 tokens so Gemini doesn't burn 30-50s thinking and trigger Vercel 504 timeout
+      const callGemini = async (withThinkingCap: boolean) => {
+        const generationConfig: Record<string, unknown> = {
+          temperature: 0.2,
+          maxOutputTokens: 12288,
+          responseMimeType: 'application/json',
+        };
+        if (withThinkingCap) {
+          generationConfig.thinkingConfig = { thinkingBudget: 512 };
+        }
+        return fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemInstruction }] },
+            contents,
+            generationConfig,
+          }),
+        });
+      };
+
+      res = await callGemini(true);
+      if (!res.ok && res.status === 400) {
+        // Fallback cleanly if model does not support thinkingConfig parameter
+        res = await callGemini(false);
+      }
+
       if (res.ok) break;
       errTxt = await res.text();
       if (res.status !== 404) break;
