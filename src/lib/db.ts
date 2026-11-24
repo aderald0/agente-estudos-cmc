@@ -216,6 +216,29 @@ export async function ensureSchema() {
     }
   }
 
+  // Idempotent migration: split Responsabilidade civil (p. 38) into its own chapter matching Apostila 07 Técnico TOC
+  await sql`
+    INSERT INTO topics (id, plan_id, subject, title, overlap, priority, status, study_queue, study_date, sort_order)
+    VALUES (
+      'adm-cap-7',
+      ${DEFAULT_PLAN_ID},
+      'Noções de Administração Pública',
+      'Responsabilidade civil da Administração Pública',
+      'ponte-peso',
+      'alta',
+      'nao-iniciado',
+      false,
+      '',
+      63
+    )
+    ON CONFLICT (id) DO NOTHING
+  `;
+  await sql`
+    UPDATE topics
+    SET title = 'Controle da Administração Pública: controle administrativo, legislativo e judicial'
+    WHERE id = 'adm-cap-6' AND title LIKE 'Controle e responsabilização%'
+  `;
+
   // Seed 200 real apostila questions for CMC 2026 if empty
   const qCount = await sql`SELECT COUNT(*)::int AS cnt FROM practice_questions WHERE plan_id = 'cmc-2026'`;
   if ((qCount[0]?.cnt ?? 0) === 0) {

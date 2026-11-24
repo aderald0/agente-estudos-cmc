@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { SUBJECT_META, SubjectMeta } from '../lib/syllabus';
+import { SUBJECT_META, SubjectMeta, TEC_ESPECIFICOS_TOC_META } from '../lib/syllabus';
 import { fmtBR, StudyPlan, Topic } from '../lib/types';
 import { Icons } from './Icons';
 
@@ -70,7 +70,7 @@ export function EditalView({
 
     if (viewMode === 'tecnico') {
       // Exact 8 apostilas of pasta tecnico/ (01 to 08):
-      // Apostila 07 merges Noções de Administração Pública (itens 1-4) + Conhecimentos Específicos — Técnico (itens 5-13)
+      // Apostila 07 merges Adm. Pública + Exclusivos in exact printed Sumário order (16 chapters, p. 1–102)
       const tecOrder: Array<{
         key: string;
         apostilaTag: string;
@@ -85,7 +85,7 @@ export function EditalView({
         { key: 'tec-04', apostilaTag: 'Apostila 04', name: 'História e Geografia de MT', overlap: 'ambos-identico', subtitle: 'Técnico: Gerais (1,00) · Idêntica à Apostila 08 do Analista', subjects: ['História e Geografia de MT'] },
         { key: 'tec-05', apostilaTag: 'Apostila 05', name: 'Noções de Ética e Filosofia', overlap: 'ambos-identico', subtitle: 'Técnico: Gerais (1,00) · Idêntica à Apostila 04 do Analista', subjects: ['Noções de Ética e Filosofia'] },
         { key: 'tec-06', apostilaTag: 'Apostila 06', name: 'Relações Interpessoais', overlap: 'ambos-identico', subtitle: 'Técnico: Gerais (1,00)+Esp · Idêntica à Apostila 05 do Analista', subjects: ['Relações Interpessoais'] },
-        { key: 'tec-07', apostilaTag: 'Apostila 07', name: 'Conhecimentos Específicos — Técnico', overlap: 'exclusivo-tecnico', subtitle: 'Técnico: Específicos (1,75+Disc) · Inclui Adm. Pública (cap. 1–6) + Exclusivos (cap. 7–15)', subjects: ['Noções de Administração Pública', 'Conhecimentos Específicos — Técnico'] },
+        { key: 'tec-07', apostilaTag: 'Apostila 07', name: 'Conhecimentos Específicos — Técnico', overlap: 'exclusivo-tecnico', subtitle: 'Técnico: Específicos (1,75+Disc) · Sumário completo (16 capítulos, págs. 1 a 102)', subjects: ['Noções de Administração Pública', 'Conhecimentos Específicos — Técnico'] },
         { key: 'tec-08', apostilaTag: 'Apostila 08', name: 'Legislação Municipal', overlap: 'ponte-peso', subtitle: 'Técnico: Básicos (1,00) · Idêntica à Apostila 09 do Analista (1,75)', subjects: ['Legislação Municipal'] },
       ];
 
@@ -95,8 +95,15 @@ export function EditalView({
         name: g.name,
         overlap: g.overlap,
         subtitle: g.subtitle,
-        matchTopics: (all: Topic[]) =>
-          all.filter(t => g.subjects.includes(t.subject) && t.overlap !== 'exclusivo-analista'),
+        matchTopics: (all: Topic[]) => {
+          const matched = all.filter(t => g.subjects.includes(t.subject) && t.overlap !== 'exclusivo-analista');
+          if (g.key === 'tec-07') {
+            return [...matched].sort(
+              (a, b) => (TEC_ESPECIFICOS_TOC_META[a.id]?.order ?? 99) - (TEC_ESPECIFICOS_TOC_META[b.id]?.order ?? 99)
+            );
+          }
+          return matched;
+        },
       }));
     }
 
@@ -324,12 +331,15 @@ export function EditalView({
                           ? 'Alta prioridade'
                           : 'Média';
 
+                      const pageNum = group.key === 'tec-07' ? TEC_ESPECIFICOS_TOC_META[t.id]?.page : undefined;
+
                       return (
                         <div key={t.id} className="tree-row">
                           <div className="tree-row-main">
                             <div className="tree-row-title">
                               <span className="muted" style={{ fontSize: 11.5, fontWeight: 600, marginRight: 6 }}>
                                 Cap. {String(idx + 1).padStart(2, '0')}
+                                {pageNum ? ` · p. ${pageNum}` : ''}
                               </span>
                               {t.title}
                             </div>

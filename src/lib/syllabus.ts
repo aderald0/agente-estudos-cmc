@@ -111,7 +111,8 @@ export const INITIAL_TOPICS: SeedTopic[] = [
   { id: 'adm-cap-3', subject: 'Noções de Administração Pública', title: 'Agentes públicos: espécies e classificação, poderes, deveres e prerrogativas; cargo, emprego e função públicos', overlap: 'ponte-peso', priority: 'alta' },
   { id: 'adm-cap-4', subject: 'Noções de Administração Pública', title: 'Poderes administrativos', overlap: 'ponte-peso', priority: 'alta' },
   { id: 'adm-cap-5', subject: 'Noções de Administração Pública', title: 'Atos administrativos: conceitos, requisitos, atributos, classificação, espécies e invalidação', overlap: 'ponte-peso', priority: 'alta' },
-  { id: 'adm-cap-6', subject: 'Noções de Administração Pública', title: 'Controle e responsabilização da administração: controle administrativo, controle judicial, controle legislativo, responsabilidade civil', overlap: 'ponte-peso', priority: 'alta' },
+  { id: 'adm-cap-6', subject: 'Noções de Administração Pública', title: 'Controle da Administração Pública: controle administrativo, legislativo e judicial', overlap: 'ponte-peso', priority: 'alta' },
+  { id: 'adm-cap-7', subject: 'Noções de Administração Pública', title: 'Responsabilidade civil da Administração Pública', overlap: 'ponte-peso', priority: 'alta' },
 
   // 10_tec_especificos.pdf (Capítulos exclusivos de Técnico além de Adm. Pública)
   { id: 'tec-cap-1', subject: 'Conhecimentos Específicos — Técnico', title: 'Noções de Direito Administrativo: princípios administrativos', overlap: 'exclusivo-tecnico', priority: 'alta' },
@@ -147,3 +148,23 @@ export const ESSAY_PROMPTS = [
   { id: 'tec-1', cargo: 'Técnico Legislativo', title: 'Atos Administrativos e Princípios Constitucionais (art. 37 CF)', desc: 'Explique os princípios LIMPE da Administração Pública e diferencie os requisitos de validade dos atos administrativos, bem como anulação e revogação.' },
   { id: 'tec-2', cargo: 'Técnico Legislativo', title: 'Processo Legislativo Municipal, Comissões e Redação Oficial', desc: 'Discorra sobre o papel das Comissões Permanentes e do Plenário na tramitação de proposições municipais e a importância da redação oficial e da arquivologia.' },
 ];
+
+// Exact printed Sumário order and page numbers of Apostila 07 (Conhecimentos Específicos — Técnico Legislativo)
+export const TEC_ESPECIFICOS_TOC_META: Record<string, { order: number; page: number }> = {
+  'adm-cap-1': { order: 1, page: 1 },
+  'adm-cap-2': { order: 2, page: 5 },
+  'adm-cap-3': { order: 3, page: 11 },
+  'tec-cap-1': { order: 4, page: 18 },
+  'adm-cap-4': { order: 5, page: 24 },
+  'adm-cap-5': { order: 6, page: 28 },
+  'adm-cap-6': { order: 7, page: 34 },
+  'adm-cap-7': { order: 8, page: 38 },
+  'tec-cap-2': { order: 9, page: 42 },
+  'tec-cap-3': { order: 10, page: 62 },
+  'tec-cap-4': { order: 11, page: 63 },
+  'tec-cap-5': { order: 12, page: 77 },
+  'tec-cap-6': { order: 13, page: 87 },
+  'tec-cap-7': { order: 14, page: 96 },
+  'tec-cap-8': { order: 15, page: 100 },
+  'tec-cap-9': { order: 16, page: 102 },
+};
