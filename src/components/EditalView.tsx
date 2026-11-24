@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { SUBJECT_META } from '../lib/syllabus';
+import { SUBJECT_META, SubjectMeta } from '../lib/syllabus';
 import { fmtBR, StudyPlan, Topic } from '../lib/types';
 import { Icons } from './Icons';
 
@@ -14,6 +14,17 @@ interface EditalViewProps {
   onTopicAction: (payload: Record<string, unknown>) => Promise<void>;
 }
 
+interface GroupedApostila {
+  key: string;
+  apostilaTag?: string;
+  name: string;
+  overlap: string;
+  subtitle: string;
+  items: Topic[];
+  done: number;
+  defaultOpen: boolean;
+}
+
 export function EditalView({
   activePlan,
   topics,
@@ -24,49 +35,127 @@ export function EditalView({
 }: EditalViewProps) {
   const isCmcPlan = !activePlan || activePlan.id === 'cmc-2026' || activePlan.category === 'concurso-duplo';
   const [search, setSearch] = useState('');
-  const [filterCargo, setFilterCargo] = useState<'all' | 'comum' | 'analista' | 'tecnico'>('all');
+  const [viewMode, setViewMode] = useState<'analista' | 'tecnico' | 'all' | 'comum'>('analista');
   const [filterSubject, setFilterSubject] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  const subjectGroups = useMemo(() => {
-    if (isCmcPlan) {
-      return SUBJECT_META;
+  // Build subject/apostila groups matching the exact Drive apostilas for Analista (01-09) and Técnico (01-08)
+  const rawGroups = useMemo(() => {
+    if (!isCmcPlan) {
+      const uniqueNames = Array.from(new Set(topics.map(t => t.subject)));
+      return uniqueNames.map(name => ({
+        key: name,
+        apostilaTag: undefined as string | undefined,
+        name,
+        overlap: 'ambos-identico',
+        subtitle: '',
+        matchTopics: (all: Topic[]) => all.filter(t => t.subject === name),
+      }));
     }
-    const uniqueNames = Array.from(new Set(topics.map(t => t.subject)));
-    return uniqueNames.map(name => ({
-      name,
-      overlap: 'ambos-identico',
-      wAnl: '',
-      wTec: '',
+
+    if (viewMode === 'analista') {
+      return SUBJECT_META.filter(sm => typeof sm.orderAnl === 'number')
+        .sort((a, b) => (a.orderAnl || 99) - (b.orderAnl || 99))
+        .map(sm => ({
+          key: `anl-${sm.name}`,
+          apostilaTag: sm.apostilaAnl,
+          name: sm.name,
+          overlap: sm.overlap,
+          subtitle: `Analista TI: ${sm.wAnl}${sm.apostilaTec ? ` · Também cai no Técnico (${sm.apostilaTec})` : ' · Exclusiva Analista TI'}`,
+          matchTopics: (all: Topic[]) =>
+            all.filter(t => t.subject === sm.name && t.overlap !== 'exclusivo-tecnico'),
+        }));
+    }
+
+    if (viewMode === 'tecnico') {
+      // Exact 8 apostilas of pasta tecnico/ (01 to 08):
+      // Apostila 07 merges Noções de Administração Pública (itens 1-4) + Conhecimentos Específicos — Técnico (itens 5-13)
+      const tecOrder: Array<{
+        key: string;
+        apostilaTag: string;
+        name: string;
+        overlap: string;
+        subtitle: string;
+        subjects: string[];
+      }> = [
+        { key: 'tec-01', apostilaTag: 'Apostila 01', name: 'Língua Portuguesa', overlap: 'ambos-identico', subtitle: 'Técnico: Básicos (1,00) · Idêntica à Apostila 01 do Analista', subjects: ['Língua Portuguesa'] },
+        { key: 'tec-02', apostilaTag: 'Apostila 02', name: 'Raciocínio Lógico e Matemático', overlap: 'ponte-peso', subtitle: 'Técnico: Básicos (1,00) · Contida na Apostila 02 do Analista', subjects: ['Raciocínio Lógico e Matemático'] },
+        { key: 'tec-03', apostilaTag: 'Apostila 03', name: 'Noções de Informática', overlap: 'ambos-identico', subtitle: 'Técnico: Básicos (1,00) · Idêntica à Apostila 03 do Analista', subjects: ['Noções de Informática'] },
+        { key: 'tec-04', apostilaTag: 'Apostila 04', name: 'História e Geografia de MT', overlap: 'ambos-identico', subtitle: 'Técnico: Gerais (1,00) · Idêntica à Apostila 08 do Analista', subjects: ['História e Geografia de MT'] },
+        { key: 'tec-05', apostilaTag: 'Apostila 05', name: 'Noções de Ética e Filosofia', overlap: 'ambos-identico', subtitle: 'Técnico: Gerais (1,00) · Idêntica à Apostila 04 do Analista', subjects: ['Noções de Ética e Filosofia'] },
+        { key: 'tec-06', apostilaTag: 'Apostila 06', name: 'Relações Interpessoais', overlap: 'ambos-identico', subtitle: 'Técnico: Gerais (1,00)+Esp · Idêntica à Apostila 05 do Analista', subjects: ['Relações Interpessoais'] },
+        { key: 'tec-07', apostilaTag: 'Apostila 07', name: 'Conhecimentos Específicos — Técnico', overlap: 'exclusivo-tecnico', subtitle: 'Técnico: Específicos (1,75+Disc) · Inclui Adm. Pública (cap. 1–6) + Exclusivos (cap. 7–15)', subjects: ['Noções de Administração Pública', 'Conhecimentos Específicos — Técnico'] },
+        { key: 'tec-08', apostilaTag: 'Apostila 08', name: 'Legislação Municipal', overlap: 'ponte-peso', subtitle: 'Técnico: Básicos (1,00) · Idêntica à Apostila 09 do Analista (1,75)', subjects: ['Legislação Municipal'] },
+      ];
+
+      return tecOrder.map(g => ({
+        key: g.key,
+        apostilaTag: g.apostilaTag,
+        name: g.name,
+        overlap: g.overlap,
+        subtitle: g.subtitle,
+        matchTopics: (all: Topic[]) =>
+          all.filter(t => g.subjects.includes(t.subject) && t.overlap !== 'exclusivo-analista'),
+      }));
+    }
+
+    // 'all' or 'comum': unified 10 disciplines with both apostila references
+    return SUBJECT_META.map((sm: SubjectMeta) => ({
+      key: `all-${sm.name}`,
+      apostilaTag: undefined as string | undefined,
+      name: sm.name,
+      overlap: sm.overlap,
+      subtitle: [
+        sm.apostilaAnl ? `Analista: ${sm.apostilaAnl} (${sm.wAnl})` : null,
+        sm.apostilaTec ? `Técnico: ${sm.apostilaTec} (${sm.wTec})` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      matchTopics: (all: Topic[]) =>
+        all.filter(t => {
+          if (t.subject !== sm.name) return false;
+          if (viewMode === 'comum' && t.overlap !== 'ambos-identico' && t.overlap !== 'ponte-peso') return false;
+          return true;
+        }),
     }));
-  }, [isCmcPlan, topics]);
+  }, [isCmcPlan, topics, viewMode]);
 
-  const filteredBySubject = useMemo(() => {
+  const filteredBySubject: GroupedApostila[] = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return subjectGroups.map((sm, groupIdx) => {
-      if (filterSubject !== 'all' && sm.name !== filterSubject) return null;
-      const items = topics.filter(t => {
-        if (t.subject !== sm.name) return false;
-        if (q && !`${t.title} ${t.subject} ${t.notes}`.toLowerCase().includes(q)) return false;
-        if (isCmcPlan) {
-          if (filterCargo === 'comum' && t.overlap !== 'ambos-identico' && t.overlap !== 'ponte-peso') return false;
-          if (filterCargo === 'analista' && t.overlap === 'exclusivo-tecnico') return false;
-          if (filterCargo === 'tecnico' && t.overlap === 'exclusivo-analista') return false;
-        }
-        if (filterStatus === 'study' && !t.study_queue) return false;
-        if (filterStatus === 'review' && !t.review_queue) return false;
-        if (filterStatus !== 'all' && filterStatus !== 'study' && filterStatus !== 'review' && t.status !== filterStatus) return false;
-        return true;
-      });
-      if (items.length === 0) return null;
-      const done = items.filter(t => t.status === 'revisar' || t.status === 'dominado').length;
-      return { meta: sm, items, done, defaultOpen: groupIdx < 2 };
-    }).filter(Boolean) as Array<{ meta: typeof subjectGroups[number]; items: Topic[]; done: number; defaultOpen: boolean }>;
-  }, [topics, subjectGroups, isCmcPlan, search, filterCargo, filterSubject, filterStatus]);
+    return rawGroups
+      .map((g, groupIdx) => {
+        if (filterSubject !== 'all' && g.name !== filterSubject) return null;
+        const items = g.matchTopics(topics).filter(t => {
+          if (q && !`${t.title} ${t.subject} ${t.notes}`.toLowerCase().includes(q)) return false;
+          if (filterStatus === 'study' && !t.study_queue) return false;
+          if (filterStatus === 'review' && !t.review_queue) return false;
+          if (filterStatus !== 'all' && filterStatus !== 'study' && filterStatus !== 'review' && t.status !== filterStatus) return false;
+          return true;
+        });
+        if (items.length === 0) return null;
+        const done = items.filter(t => t.status === 'revisar' || t.status === 'dominado').length;
+        return {
+          key: g.key,
+          apostilaTag: g.apostilaTag,
+          name: g.name,
+          overlap: g.overlap,
+          subtitle: g.subtitle,
+          items,
+          done,
+          defaultOpen: groupIdx < 1,
+        };
+      })
+      .filter(Boolean) as GroupedApostila[];
+  }, [topics, rawGroups, search, filterSubject, filterStatus]);
 
-  function toggleExpand(name: string, currentOpen: boolean) {
-    setExpanded(prev => ({ ...prev, [name]: !currentOpen }));
+  const totalVisibleTopics = useMemo(
+    () => filteredBySubject.reduce((acc, g) => acc + g.items.length, 0),
+    [filteredBySubject]
+  );
+
+  function toggleExpand(key: string, currentOpen: boolean) {
+    setExpanded(prev => ({ ...prev, [key]: !currentOpen }));
   }
 
   function statusLabel(st: string) {
@@ -85,31 +174,74 @@ export function EditalView({
 
   return (
     <div className="ds-container">
+      {/* Apostila / Folder Selector for CMC 2026 */}
+      {isCmcPlan && (
+        <div className="flex-row" style={{ justifyContent: 'space-between', gap: 12 }}>
+          <div className="segmented" role="tablist" aria-label="Separar por apostilas">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'analista'}
+              className={`seg-btn ${viewMode === 'analista' ? 'active' : ''}`}
+              onClick={() => {
+                setViewMode('analista');
+                setFilterSubject('all');
+              }}
+            >
+              Apostilas Analista TI (01–09)
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'tecnico'}
+              className={`seg-btn ${viewMode === 'tecnico' ? 'active' : ''}`}
+              onClick={() => {
+                setViewMode('tecnico');
+                setFilterSubject('all');
+              }}
+            >
+              Apostilas Técnico (01–08)
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'all'}
+              className={`seg-btn ${viewMode === 'all' ? 'active' : ''}`}
+              onClick={() => {
+                setViewMode('all');
+                setFilterSubject('all');
+              }}
+            >
+              Todas unificadas
+            </button>
+          </div>
+
+          <span className="text-xs muted">
+            {filteredBySubject.length} {viewMode === 'analista' || viewMode === 'tecnico' ? 'apostilas' : 'disciplinas'} · {totalVisibleTopics} capítulos
+          </span>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="ds-card ds-card-body">
-        <div className="edital-toolbar" style={!isCmcPlan ? { gridTemplateColumns: '2fr 1fr 1fr auto' } : undefined}>
+        <div className="edital-toolbar" style={{ gridTemplateColumns: '2fr 1fr 1fr auto' }}>
           <div className="search-wrap">
             <Icons.Search size={15} />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Pesquisar conteúdo ou assunto..."
+              placeholder="Pesquisar capítulo ou assunto..."
             />
           </div>
 
-          {isCmcPlan && (
-            <select aria-label="Cargo" className="ds-select" value={filterCargo} onChange={e => setFilterCargo(e.target.value as 'all' | 'comum' | 'analista' | 'tecnico')}>
-              <option value="all">Cargo: Todos</option>
-              <option value="comum">Comuns aos 2 Cargos</option>
-              <option value="analista">Analista TI</option>
-              <option value="tecnico">Técnico Legislativo</option>
-            </select>
-          )}
-
           <select aria-label="Matéria" className="ds-select" value={filterSubject} onChange={e => setFilterSubject(e.target.value)}>
-            <option value="all">Matéria: Todas</option>
-            {subjectGroups.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+            <option value="all">{viewMode === 'analista' || viewMode === 'tecnico' ? 'Apostila: Todas' : 'Matéria: Todas'}</option>
+            {rawGroups.map(s => (
+              <option key={s.key} value={s.name}>
+                {s.apostilaTag ? `${s.apostilaTag} · ${s.name}` : s.name}
+              </option>
+            ))}
           </select>
 
           <select aria-label="Status" className="ds-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
@@ -126,7 +258,7 @@ export function EditalView({
         </div>
       </div>
 
-      {/* Tree / Accordion por Matéria */}
+      {/* Tree / Accordion por Apostila ou Matéria */}
       {filteredBySubject.length === 0 ? (
         <div className="ds-card empty-box">
           <div className="empty-title">Nenhum conteúdo encontrado</div>
@@ -134,35 +266,40 @@ export function EditalView({
         </div>
       ) : (
         <div className="subject-tree">
-          {filteredBySubject.map(({ meta, items, done, defaultOpen }) => {
-            const explicit = expanded[meta.name];
+          {filteredBySubject.map(group => {
+            const explicit = expanded[group.key];
             const isOpen = Boolean(
               search.trim() ||
               filterSubject !== 'all' ||
               filterStatus !== 'all' ||
-              (explicit !== undefined ? explicit : defaultOpen)
+              (explicit !== undefined ? explicit : group.defaultOpen)
             );
-            const pct = items.length ? Math.round((done / items.length) * 100) : 0;
-            const ov = overlapLabel(meta.overlap);
+            const pct = group.items.length ? Math.round((group.done / group.items.length) * 100) : 0;
+            const ov = overlapLabel(group.overlap);
 
             return (
-              <section key={meta.name} className="ds-card">
-                <button className="tree-header" onClick={() => toggleExpand(meta.name, isOpen)}>
+              <section key={group.key} className="ds-card">
+                <button className="tree-header" onClick={() => toggleExpand(group.key, isOpen)}>
                   <div className="tree-title-group">
                     <div className="flex-row" style={{ gap: 8 }}>
-                      <span className="tree-subject-name">{meta.name}</span>
+                      {group.apostilaTag && (
+                        <span className="ds-badge ds-badge-neutral" style={{ fontWeight: 700 }}>
+                          {group.apostilaTag}
+                        </span>
+                      )}
+                      <span className="tree-subject-name">{group.name}</span>
                       {isCmcPlan && <span className={`ds-badge ${ov.cls}`}>{ov.txt}</span>}
                     </div>
-                    {isCmcPlan && meta.wAnl && (
+                    {group.subtitle && (
                       <div className="text-xs muted" style={{ marginTop: 3 }}>
-                        Analista: {meta.wAnl} · Técnico: {meta.wTec}
+                        {group.subtitle}
                       </div>
                     )}
                   </div>
 
                   <div className="tree-right">
                     <div className="tree-prog-wrap">
-                      <span className="text-xs muted">{done}/{items.length} ({pct}%)</span>
+                      <span className="text-xs muted">{group.done}/{group.items.length} ({pct}%)</span>
                       <div className="ds-progress" style={{ width: 84 }}>
                         <div className="ds-progress-fill indigo" style={{ width: `${pct}%` }} />
                       </div>
@@ -173,7 +310,7 @@ export function EditalView({
 
                 {isOpen && (
                   <div className="tree-children">
-                    {items.map(t => {
+                    {group.items.map((t, idx) => {
                       const st = statusLabel(t.status);
                       const lowAcc = t.q_total >= 4 && (t.q_right / t.q_total) < 0.6;
                       const priBadge =
@@ -190,7 +327,12 @@ export function EditalView({
                       return (
                         <div key={t.id} className="tree-row">
                           <div className="tree-row-main">
-                            <div className="tree-row-title">{t.title}</div>
+                            <div className="tree-row-title">
+                              <span className="muted" style={{ fontSize: 11.5, fontWeight: 600, marginRight: 6 }}>
+                                Cap. {String(idx + 1).padStart(2, '0')}
+                              </span>
+                              {t.title}
+                            </div>
                             <div className="tree-row-meta">
                               <span className={`ds-badge ${st.cls}`}>{st.txt}</span>
                               <span className="ds-badge ds-badge-indigo">{priBadge}</span>

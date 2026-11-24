@@ -3,6 +3,10 @@ export interface SubjectMeta {
   overlap: 'ambos-identico' | 'ponte-peso' | 'exclusivo-analista' | 'exclusivo-tecnico';
   wAnl: string;
   wTec: string;
+  apostilaAnl?: string;
+  apostilaTec?: string;
+  orderAnl?: number;
+  orderTec?: number;
 }
 
 export interface SeedTopic {
@@ -16,16 +20,16 @@ export interface SeedTopic {
 export const EXAM_DATE = '2026-12-20';
 
 export const SUBJECT_META: SubjectMeta[] = [
-  { name: 'Língua Portuguesa', overlap: 'ambos-identico', wAnl: 'Básicos (1,00)', wTec: 'Básicos (1,00)' },
-  { name: 'Raciocínio Lógico e Matemático', overlap: 'ponte-peso', wAnl: 'Básicos (1,00)', wTec: 'Básicos (1,00)' },
-  { name: 'Noções de Informática', overlap: 'ambos-identico', wAnl: 'Básicos (1,00)', wTec: 'Básicos (1,00)' },
-  { name: 'História e Geografia de MT', overlap: 'ambos-identico', wAnl: 'Gerais (1,00)', wTec: 'Gerais (1,00)' },
-  { name: 'Noções de Ética e Filosofia', overlap: 'ambos-identico', wAnl: 'Gerais (1,00)', wTec: 'Gerais (1,00)' },
-  { name: 'Relações Interpessoais', overlap: 'ambos-identico', wAnl: 'Gerais (1,00)', wTec: 'Gerais (1,00)+Esp' },
-  { name: 'Legislação Municipal', overlap: 'ponte-peso', wAnl: 'Específicos (1,75)', wTec: 'Básicos (1,00)' },
-  { name: 'Noções de Administração Pública', overlap: 'ponte-peso', wAnl: 'Gerais (1,00)', wTec: 'Específicos (1,75)' },
-  { name: 'Conhecimentos Específicos — Técnico', overlap: 'exclusivo-tecnico', wAnl: '—', wTec: 'Específicos (1,75+Disc)' },
-  { name: 'Conhecimentos Específicos — Analista TI', overlap: 'exclusivo-analista', wAnl: 'Específicos (1,75+Disc)', wTec: '—' },
+  { name: 'Língua Portuguesa', overlap: 'ambos-identico', wAnl: 'Básicos (1,00)', wTec: 'Básicos (1,00)', apostilaAnl: 'Apostila 01', apostilaTec: 'Apostila 01', orderAnl: 1, orderTec: 1 },
+  { name: 'Raciocínio Lógico e Matemático', overlap: 'ponte-peso', wAnl: 'Básicos (1,00)', wTec: 'Básicos (1,00)', apostilaAnl: 'Apostila 02', apostilaTec: 'Apostila 02', orderAnl: 2, orderTec: 2 },
+  { name: 'Noções de Informática', overlap: 'ambos-identico', wAnl: 'Básicos (1,00)', wTec: 'Básicos (1,00)', apostilaAnl: 'Apostila 03', apostilaTec: 'Apostila 03', orderAnl: 3, orderTec: 3 },
+  { name: 'Noções de Ética e Filosofia', overlap: 'ambos-identico', wAnl: 'Gerais (1,00)', wTec: 'Gerais (1,00)', apostilaAnl: 'Apostila 04', apostilaTec: 'Apostila 05', orderAnl: 4, orderTec: 5 },
+  { name: 'Relações Interpessoais', overlap: 'ambos-identico', wAnl: 'Gerais (1,00)', wTec: 'Gerais (1,00)+Esp', apostilaAnl: 'Apostila 05', apostilaTec: 'Apostila 06', orderAnl: 5, orderTec: 6 },
+  { name: 'Noções de Administração Pública', overlap: 'ponte-peso', wAnl: 'Gerais (1,00)', wTec: 'Específicos (1,75)', apostilaAnl: 'Apostila 06', apostilaTec: 'Apostila 07 (parte 1)', orderAnl: 6, orderTec: 7 },
+  { name: 'Conhecimentos Específicos — Analista TI', overlap: 'exclusivo-analista', wAnl: 'Específicos (1,75+Disc)', wTec: '—', apostilaAnl: 'Apostila 07', orderAnl: 7 },
+  { name: 'História e Geografia de MT', overlap: 'ambos-identico', wAnl: 'Gerais (1,00)', wTec: 'Gerais (1,00)', apostilaAnl: 'Apostila 08', apostilaTec: 'Apostila 04', orderAnl: 8, orderTec: 4 },
+  { name: 'Legislação Municipal', overlap: 'ponte-peso', wAnl: 'Específicos (1,75)', wTec: 'Básicos (1,00)', apostilaAnl: 'Apostila 09', apostilaTec: 'Apostila 08', orderAnl: 9, orderTec: 8 },
+  { name: 'Conhecimentos Específicos — Técnico', overlap: 'exclusivo-tecnico', wAnl: '—', wTec: 'Específicos (1,75+Disc)', apostilaTec: 'Apostila 07', orderTec: 7 },
 ];
 
 export const INITIAL_TOPICS: SeedTopic[] = [
