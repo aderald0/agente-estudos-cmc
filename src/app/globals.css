@@ -2516,6 +2516,25 @@ body.dark .reader-validation-banner.status-atencao { background: #291f0b; color:
    RESPONSIVE BREAKPOINTS
    ========================================================================== */
 
+.reader-mobile-backdrop {
+  position: fixed;
+  inset: 56px 0 0 0;
+  z-index: 910;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.reader-mobile-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: var(--c-surface);
+  border-top: 1px solid var(--c-border);
+  flex-shrink: 0;
+}
+
 @media (max-width: 1024px) {
   .today-hero,
   .lib-hero,
@@ -2526,7 +2545,42 @@ body.dark .reader-validation-banner.status-atencao { background: #291f0b; color:
   .priority-cards-grid {
     grid-template-columns: 1fr;
   }
-  .reader-study-panel { display: none; }
+}
+
+@media (max-width: 900px) {
+  .reader-toc {
+    position: fixed;
+    left: 0;
+    top: 56px;
+    bottom: 0;
+    width: min(86vw, 320px);
+    z-index: 920;
+    box-shadow: var(--sh-lg);
+  }
+  .reader-study-panel {
+    position: fixed;
+    right: 0;
+    top: 56px;
+    bottom: 0;
+    width: min(88vw, 330px);
+    z-index: 920;
+    box-shadow: var(--sh-lg);
+  }
+  .reader-controls { display: none; }
+  .reader-topbar {
+    padding: 6px 10px;
+    gap: 8px;
+  }
+  .reader-code-badge { display: none; }
+  .reader-canvas-wrap {
+    padding: 10px 8px 24px;
+  }
+  .reader-fallback-bar {
+    padding: 10px 12px;
+  }
+  .reader-fallback-hint {
+    font-size: 11.5px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -2546,13 +2600,4 @@ body.dark .reader-validation-banner.status-atencao { background: #291f0b; color:
     flex-direction: column;
     align-items: stretch;
   }
-  .reader-toc {
-    position: fixed;
-    left: 0;
-    top: 56px;
-    bottom: 0;
-    z-index: 920;
-    box-shadow: var(--sh-lg);
-  }
-  .reader-controls { display: none; }
 }

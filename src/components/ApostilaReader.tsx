@@ -55,11 +55,25 @@ export function ApostilaReader({
   const apostila = useMemo(() => getApostilaById(target.apostilaId), [target.apostilaId]);
   const storedMeta = storedMap[target.apostilaId];
 
+  const [isMobile, setIsMobile] = useState(false);
   const [showToc, setShowToc] = useState(true);
   const [showStudyPanel, setShowStudyPanel] = useState(true);
   const [tone, setTone] = useState<ReadingTone>('paper');
   const [zoom, setZoom] = useState(1.15);
   const [fallbackMode, setFallbackMode] = useState<'drive' | 'upload'>('drive');
+
+  useEffect(() => {
+    const mobile = window.innerWidth <= 900;
+    setIsMobile(mobile);
+    if (mobile) {
+      setShowToc(false);
+      setShowStudyPanel(false);
+      setZoom(1);
+    }
+    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // PDF.js state
   const [pdfDoc, setPdfDoc] = useState<PdfDocProxy | null>(null);
@@ -225,7 +239,12 @@ export function ApostilaReader({
         if (cancelled || !canvasRef.current) return;
 
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        const viewport = page.getViewport({ scale: zoom * dpr });
+        const baseViewport = page.getViewport({ scale: 1 });
+        const stageWidth = stageRef.current ? Math.max(280, stageRef.current.clientWidth - 24) : 360;
+        const effectiveScale = isMobile
+          ? (stageWidth / baseViewport.width) * zoom
+          : zoom;
+        const viewport = page.getViewport({ scale: effectiveScale * dpr });
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
@@ -250,7 +269,7 @@ export function ApostilaReader({
       cancelled = true;
       renderTaskRef.current?.cancel?.();
     };
-  }, [pdfDoc, currentPage, zoom, target.apostilaId]);
+  }, [pdfDoc, currentPage, zoom, target.apostilaId, isMobile]);
 
   const goToPage = useCallback(
     (p: number) => {
@@ -475,16 +494,24 @@ export function ApostilaReader({
               target="_blank"
               rel="noopener noreferrer"
               className="btn-ghost reader-drive-link"
+              aria-label="Abrir no Google Drive"
             >
-              <Icons.ExternalLink size={14} /> Drive
+              <Icons.ExternalLink size={14} /> <span className="hide-mobile">Drive</span>
             </a>
           )}
           <button
             type="button"
             className={`btn-ghost ${showStudyPanel ? 'active-pill' : ''}`}
-            onClick={() => setShowStudyPanel(v => !v)}
+            onClick={() => {
+              setShowStudyPanel(v => {
+                const next = !v;
+                if (next && isMobile) setShowToc(false);
+                return next;
+              });
+            }}
+            aria-label="Painel de estudo e anotações"
           >
-            <Icons.Clock size={14} /> Estudo
+            <Icons.Clock size={14} /> <span className="hide-mobile">Estudo</span>
           </button>
         </div>
       </header>
@@ -497,12 +524,36 @@ export function ApostilaReader({
 
       {/* Main 3-Pane Workspace */}
       <div className="reader-workspace">
+        {/* Mobile Backdrop when TOC or Study drawer is open */}
+        {isMobile && (showToc || showStudyPanel) && (
+          <div
+            className="reader-mobile-backdrop"
+            onClick={() => {
+              setShowToc(false);
+              setShowStudyPanel(false);
+            }}
+            aria-hidden="true"
+          />
+        )}
+
         {/* Left Sidebar: Interactive Apostila Sumário */}
         {showToc && (
           <aside className="reader-toc" aria-label="Sumário da apostila">
             <div className="reader-toc-header">
               <span>SUMÁRIO DA APOSTILA</span>
-              <span className="mono">{apostila.totalPages} págs</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="mono">{apostila.totalPages} págs</span>
+                {isMobile && (
+                  <button
+                    type="button"
+                    className="reader-icon-btn"
+                    onClick={() => setShowToc(false)}
+                    aria-label="Fechar sumário"
+                  >
+                    <Icons.Close size={15} />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="reader-toc-list">
               {apostila.chapters.map(ch => {
@@ -524,6 +575,7 @@ export function ApostilaReader({
                           chapterTitle: ch.title,
                         });
                       }
+                      if (isMobile) setShowToc(false);
                     }}
                   >
                     <div className="reader-toc-item-top">
@@ -547,7 +599,10 @@ export function ApostilaReader({
                   <button
                     type="button"
                     className="btn-ghost"
-                    onClick={() => goToPage(apostila.questionsPrintedPage! + apostila.pageOffset)}
+                    onClick={() => {
+                      goToPage(apostila.questionsPrintedPage! + apostila.pageOffset);
+                      if (isMobile) setShowToc(false);
+                    }}
                   >
                     Questões (p. {apostila.questionsPrintedPage})
                   </button>
@@ -556,7 +611,10 @@ export function ApostilaReader({
                   <button
                     type="button"
                     className="btn-ghost"
-                    onClick={() => goToPage(apostila.answerKeyPrintedPage! + apostila.pageOffset)}
+                    onClick={() => {
+                      goToPage(apostila.answerKeyPrintedPage! + apostila.pageOffset);
+                      if (isMobile) setShowToc(false);
+                    }}
                   >
                     Gabarito (p. {apostila.answerKeyPrintedPage})
                   </button>
@@ -706,6 +764,19 @@ export function ApostilaReader({
         {/* Right Sidebar: Study Timer, Status & Notes */}
         {showStudyPanel && (
           <aside className="reader-study-panel" aria-label="Painel de estudo ativo">
+            {isMobile && (
+              <div className="reader-toc-header" style={{ padding: '0 0 10px', marginBottom: 4 }}>
+                <span>ESTUDO &amp; ANOTAÇÕES</span>
+                <button
+                  type="button"
+                  className="reader-icon-btn"
+                  onClick={() => setShowStudyPanel(false)}
+                  aria-label="Fechar painel de estudo"
+                >
+                  <Icons.Close size={15} />
+                </button>
+              </div>
+            )}
             <div className="reader-panel-section">
               <span className="reader-panel-label">CRONÔMETRO DA SESSÃO</span>
               <div className="reader-timer-display">{mm}:{ss}</div>
@@ -790,6 +861,50 @@ export function ApostilaReader({
           </aside>
         )}
       </div>
+
+      {/* Mobile Bottom Controls Bar (when local PDF loaded) */}
+      {isMobile && pdfDoc && (
+        <div className="reader-mobile-bar" role="toolbar" aria-label="Controles de leitura mobile">
+          <button
+            type="button"
+            className="reader-icon-btn"
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage <= 1}
+            aria-label="Página anterior"
+          >
+            <Icons.ChevronLeft size={18} />
+          </button>
+          <span className="mono" style={{ fontSize: 12.5 }}>
+            p. <strong>{printedPage}</strong> ({currentPage}/{numPages})
+          </span>
+          <button
+            type="button"
+            className="reader-icon-btn"
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage >= numPages}
+            aria-label="Próxima página"
+          >
+            <Icons.ChevronRight size={18} />
+          </button>
+          <span className="reader-divider" aria-hidden="true" />
+          <button
+            type="button"
+            className="reader-icon-btn"
+            onClick={() => setZoom(z => Math.max(0.7, +(z - 0.15).toFixed(2)))}
+            aria-label="Diminuir zoom"
+          >
+            <Icons.ZoomOut size={16} />
+          </button>
+          <button
+            type="button"
+            className="reader-icon-btn"
+            onClick={() => setZoom(z => Math.min(2.0, +(z + 0.15).toFixed(2)))}
+            aria-label="Aumentar zoom"
+          >
+            <Icons.ZoomIn size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
