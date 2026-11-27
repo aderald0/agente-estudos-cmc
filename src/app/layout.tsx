@@ -1,6 +1,12 @@
 import type { Metadata, Viewport } from 'next';
-import { Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
+import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+
+const serif = Fraunces({
+  subsets: ['latin'],
+  weight: ['500', '600', '700'],
+  variable: '--font-serif',
+});
 
 const sans = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -10,12 +16,12 @@ const sans = Plus_Jakarta_Sans({
 
 const mono = JetBrains_Mono({
   subsets: ['latin'],
-  weight: ['400', '500'],
+  weight: ['400', '500', '600'],
   variable: '--font-mono',
 });
 
 export const viewport: Viewport = {
-  themeColor: '#111110',
+  themeColor: '#14533f',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -23,8 +29,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'CMC 2026 · Plano de Estudos (Analista TI & Técnico)',
-  description: 'Organizador de estudos para Câmara Municipal de Cuiabá 2026 com Material Design 3, Neon Postgres e Mentor Gemini.',
+  title: 'CMC 2026 · Biblioteca de Apostilas, Edital & Leitor Integrado',
+  description: 'Estudo integrado para a Câmara Municipal de Cuiabá 2026 (Analista TI & Técnico Legislativo) com sumário das apostilas, validação do edital e leitor PDF direto na matéria.',
   applicationName: 'Estudos CMC 2026',
   appleWebApp: {
     capable: true,
@@ -49,7 +55,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={`${sans.variable} ${mono.variable}`}>
+    <html lang="pt-BR" className={`${serif.variable} ${sans.variable} ${mono.variable}`}>
       <body>{children}</body>
     </html>
   );

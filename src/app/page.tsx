@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ApostilaReader } from '../components/ApostilaReader';
+import { ApostilasLibraryView } from '../components/ApostilasLibraryView';
 import { EditalView } from '../components/EditalView';
 import { FocusModal } from '../components/FocusModal';
 import { Icons } from '../components/Icons';
@@ -9,6 +11,7 @@ import { NewStudyView } from '../components/NewStudyView';
 import { NotebookView } from '../components/NotebookView';
 import { PracticeView } from '../components/PracticeView';
 import { TodayDashboard } from '../components/TodayDashboard';
+import { listStoredApostilas, StoredApostilaMeta } from '../lib/pdfStorage';
 import { EXAM_DATE, SUBJECT_META } from '../lib/syllabus';
 import {
   ChatMsg,
@@ -17,6 +20,7 @@ import {
   Flashcard,
   NavTab,
   PracticeQuestion,
+  ReaderTarget,
   StudyLog,
   StudyPlan,
   Topic,
@@ -71,11 +75,22 @@ export default function HomePage() {
 
   const [focusTopic, setFocusTopic] = useState<Topic | null>(null);
   const [editTopic, setEditTopic] = useState<Topic | null>(null);
+  const [readerTarget, setReaderTarget] = useState<ReaderTarget | null>(null);
+  const [storedMap, setStoredMap] = useState<Record<string, StoredApostilaMeta>>({});
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [ncSubject, setNcSubject] = useState(SUBJECT_META[0].name);
   const [ncTitle, setNcTitle] = useState('');
   const [ncOverlap, setNcOverlap] = useState('ambos-identico');
   const [ncStudy, setNcStudy] = useState(true);
+
+  const refreshStoredPdfs = useCallback(async () => {
+    const map = await listStoredApostilas();
+    setStoredMap(map);
+  }, []);
+
+  useEffect(() => {
+    refreshStoredPdfs();
+  }, [refreshStoredPdfs]);
 
   const loadState = useCallback(async (overridePlanId?: string) => {
     const targetPlanId = overridePlanId || activePlanId || DEFAULT_PLAN_ID;
@@ -540,14 +555,17 @@ export default function HomePage() {
             <button className={`pierre-nav-pill ${tab === 'hoje' ? 'active' : ''}`} onClick={() => setTab('hoje')}>
               <Icons.Home size={15} /> <span>Hoje</span>
             </button>
+            <button className={`pierre-nav-pill ${tab === 'apostilas' ? 'active' : ''}`} onClick={() => setTab('apostilas')}>
+              <Icons.Library size={15} /> <span>Apostilas</span>
+            </button>
+            <button className={`pierre-nav-pill ${tab === 'edital' ? 'active' : ''}`} onClick={() => setTab('edital')}>
+              <Icons.ShieldCheck size={15} /> <span>{syllabusTabLabel}</span>
+            </button>
             <button className={`pierre-nav-pill ${tab === 'pratica' ? 'active' : ''}`} onClick={() => setTab('pratica')}>
               <Icons.Check size={15} /> <span>Prática</span>
             </button>
             <button className={`pierre-nav-pill ${tab === 'mentor' ? 'active' : ''}`} onClick={() => setTab('mentor')}>
               <Icons.Sparkles size={15} /> <span>Mentor</span>
-            </button>
-            <button className={`pierre-nav-pill ${tab === 'edital' ? 'active' : ''}`} onClick={() => setTab('edital')}>
-              <Icons.BookOpen size={15} /> <span>{syllabusTabLabel}</span>
             </button>
             <button className={`pierre-nav-pill ${tab === 'caderno' ? 'active' : ''}`} onClick={() => setTab('caderno')}>
               <Icons.FileText size={15} /> <span>Caderno</span>
@@ -592,6 +610,7 @@ export default function HomePage() {
               activePlan={activePlan}
               topics={topics}
               questions={questions}
+              storedMap={storedMap}
               loading={loading}
               onStartFocus={t => setFocusTopic(t)}
               onTopicAction={topicAction}
@@ -600,6 +619,17 @@ export default function HomePage() {
                 sendMessage('O que estudar hoje? Monte meu plano com os tópicos mais importantes.');
               }}
               onNavigate={setTab}
+              onOpenReader={target => setReaderTarget(target)}
+            />
+          )}
+
+          {tab === 'apostilas' && (
+            <ApostilasLibraryView
+              topics={topics}
+              storedMap={storedMap}
+              onOpenReader={target => setReaderTarget(target)}
+              onRefreshStored={refreshStoredPdfs}
+              onTopicAction={topicAction}
             />
           )}
 
@@ -655,6 +685,7 @@ export default function HomePage() {
                 setShowCustomModal(true);
               }}
               onTopicAction={topicAction}
+              onOpenReader={target => setReaderTarget(target)}
             />
           )}
 
@@ -703,22 +734,40 @@ export default function HomePage() {
         {/* MOBILE BOTTOM NAVIGATION */}
         <nav className="mobile-bottom-nav" aria-label="Navegação mobile">
           <button className={`mob-nav-btn ${tab === 'hoje' ? 'active' : ''}`} onClick={() => setTab('hoje')}>
-            <Icons.Home size={19} /> <span>Hoje</span>
+            <Icons.Home size={18} /> <span>Hoje</span>
           </button>
-          <button className={`mob-nav-btn ${tab === 'pratica' ? 'active' : ''}`} onClick={() => setTab('pratica')}>
-            <Icons.Check size={19} /> <span>Prática</span>
-          </button>
-          <button className={`mob-nav-btn ${tab === 'mentor' ? 'active' : ''}`} onClick={() => setTab('mentor')}>
-            <Icons.Sparkles size={19} /> <span>Mentor</span>
+          <button className={`mob-nav-btn ${tab === 'apostilas' ? 'active' : ''}`} onClick={() => setTab('apostilas')}>
+            <Icons.Library size={18} /> <span>Apostilas</span>
           </button>
           <button className={`mob-nav-btn ${tab === 'edital' ? 'active' : ''}`} onClick={() => setTab('edital')}>
-            <Icons.BookOpen size={19} /> <span>{syllabusTabLabel}</span>
+            <Icons.ShieldCheck size={18} /> <span>{syllabusTabLabel}</span>
+          </button>
+          <button className={`mob-nav-btn ${tab === 'pratica' ? 'active' : ''}`} onClick={() => setTab('pratica')}>
+            <Icons.Check size={18} /> <span>Prática</span>
+          </button>
+          <button className={`mob-nav-btn ${tab === 'mentor' ? 'active' : ''}`} onClick={() => setTab('mentor')}>
+            <Icons.Sparkles size={18} /> <span>Mentor</span>
           </button>
           <button className={`mob-nav-btn ${tab === 'caderno' ? 'active' : ''}`} onClick={() => setTab('caderno')}>
-            <Icons.FileText size={19} /> <span>Caderno</span>
+            <Icons.FileText size={18} /> <span>Caderno</span>
           </button>
         </nav>
       </div>
+
+      {/* INTEGRATED APOSTILA PDF READER OVERLAY */}
+      {readerTarget && (
+        <ApostilaReader
+          target={readerTarget}
+          topics={topics}
+          storedMap={storedMap}
+          onClose={() => setReaderTarget(null)}
+          onPdfStored={meta => {
+            setStoredMap(prev => ({ ...prev, [meta.apostilaId]: meta }));
+          }}
+          onTopicAction={topicAction}
+          onSwitchTarget={next => setReaderTarget(next)}
+        />
+      )}
 
       {/* FOCUS STUDY SESSION MODAL */}
       <FocusModal

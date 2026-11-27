@@ -1,8 +1,15 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { SUBJECT_META, SubjectMeta, TEC_ESPECIFICOS_TOC_META } from '../lib/syllabus';
-import { fmtBR, StudyPlan, Topic } from '../lib/types';
+import {
+  CargoKey,
+  EDITAL_AUDIT_FINDINGS,
+  EDITAL_CARGOS,
+  EDITAL_INFO,
+  findChapterForTopic,
+  getApostilasForCargo,
+} from '../lib/apostilasCatalog';
+import { fmtBR, ReaderTarget, StudyPlan, Topic } from '../lib/types';
 import { Icons } from './Icons';
 
 interface EditalViewProps {
@@ -12,17 +19,7 @@ interface EditalViewProps {
   onEditTopic: (topic: Topic) => void;
   onCreateCustom: () => void;
   onTopicAction: (payload: Record<string, unknown>) => Promise<void>;
-}
-
-interface GroupedApostila {
-  key: string;
-  apostilaTag?: string;
-  name: string;
-  overlap: string;
-  subtitle: string;
-  items: Topic[];
-  done: number;
-  defaultOpen: boolean;
+  onOpenReader: (target: ReaderTarget) => void;
 }
 
 export function EditalView({
@@ -32,365 +29,496 @@ export function EditalView({
   onEditTopic,
   onCreateCustom,
   onTopicAction,
+  onOpenReader,
 }: EditalViewProps) {
   const isCmcPlan = !activePlan || activePlan.id === 'cmc-2026' || activePlan.category === 'concurso-duplo';
+  const [cargoTab, setCargoTab] = useState<'analista' | 'tecnico' | 'all'>('analista');
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<'analista' | 'tecnico' | 'all' | 'comum'>('analista');
-  const [filterSubject, setFilterSubject] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pendente' | 'estudando' | 'concluido'>('all');
+  const [showAudit, setShowAudit] = useState(true);
 
-  // Build subject/apostila groups matching the exact Drive apostilas for Analista (01-09) and Técnico (01-08)
-  const rawGroups = useMemo(() => {
-    if (!isCmcPlan) {
-      const uniqueNames = Array.from(new Set(topics.map(t => t.subject)));
-      return uniqueNames.map(name => ({
-        key: name,
-        apostilaTag: undefined as string | undefined,
-        name,
-        overlap: 'ambos-identico',
-        subtitle: '',
-        matchTopics: (all: Topic[]) => all.filter(t => t.subject === name),
-      }));
-    }
+  const topicMap = useMemo(() => {
+    const m = new Map<string, Topic>();
+    for (const t of topics) m.set(t.id, t);
+    return m;
+  }, [topics]);
 
-    if (viewMode === 'analista') {
-      return SUBJECT_META.filter(sm => typeof sm.orderAnl === 'number')
-        .sort((a, b) => (a.orderAnl || 99) - (b.orderAnl || 99))
-        .map(sm => ({
-          key: `anl-${sm.name}`,
-          apostilaTag: sm.apostilaAnl,
-          name: sm.name,
-          overlap: sm.overlap,
-          subtitle: `Analista TI: ${sm.wAnl}${sm.apostilaTec ? ` · Também cai no Técnico (${sm.apostilaTec})` : ' · Exclusiva Analista TI'}`,
-          matchTopics: (all: Topic[]) =>
-            all.filter(t => t.subject === sm.name && t.overlap !== 'exclusivo-tecnico'),
-        }));
-    }
+  const preferredCargo: CargoKey = cargoTab === 'tecnico' ? 'tecnico' : 'analista';
 
-    if (viewMode === 'tecnico') {
-      // Exact 8 apostilas of pasta tecnico/ (01 to 08):
-      // Apostila 07 merges Adm. Pública + Exclusivos in exact printed Sumário order (16 chapters, p. 1–102)
-      const tecOrder: Array<{
-        key: string;
-        apostilaTag: string;
-        name: string;
-        overlap: string;
-        subtitle: string;
-        subjects: string[];
-      }> = [
-        { key: 'tec-01', apostilaTag: 'Apostila 01', name: 'Língua Portuguesa', overlap: 'ambos-identico', subtitle: 'Técnico: Básicos (1,00) · Idêntica à Apostila 01 do Analista', subjects: ['Língua Portuguesa'] },
-        { key: 'tec-02', apostilaTag: 'Apostila 02', name: 'Raciocínio Lógico e Matemático', overlap: 'ponte-peso', subtitle: 'Técnico: Básicos (1,00) · Contida na Apostila 02 do Analista', subjects: ['Raciocínio Lógico e Matemático'] },
-        { key: 'tec-03', apostilaTag: 'Apostila 03', name: 'Noções de Informática', overlap: 'ambos-identico', subtitle: 'Técnico: Básicos (1,00) · Idêntica à Apostila 03 do Analista', subjects: ['Noções de Informática'] },
-        { key: 'tec-04', apostilaTag: 'Apostila 04', name: 'História e Geografia de MT', overlap: 'ambos-identico', subtitle: 'Técnico: Gerais (1,00) · Idêntica à Apostila 08 do Analista', subjects: ['História e Geografia de MT'] },
-        { key: 'tec-05', apostilaTag: 'Apostila 05', name: 'Noções de Ética e Filosofia', overlap: 'ambos-identico', subtitle: 'Técnico: Gerais (1,00) · Idêntica à Apostila 04 do Analista', subjects: ['Noções de Ética e Filosofia'] },
-        { key: 'tec-06', apostilaTag: 'Apostila 06', name: 'Relações Interpessoais', overlap: 'ambos-identico', subtitle: 'Técnico: Gerais (1,00)+Esp · Idêntica à Apostila 05 do Analista', subjects: ['Relações Interpessoais'] },
-        { key: 'tec-07', apostilaTag: 'Apostila 07', name: 'Conhecimentos Específicos — Técnico', overlap: 'exclusivo-tecnico', subtitle: 'Técnico: Específicos (1,75+Disc) · Sumário completo (16 capítulos, págs. 1 a 102)', subjects: ['Noções de Administração Pública', 'Conhecimentos Específicos — Técnico'] },
-        { key: 'tec-08', apostilaTag: 'Apostila 08', name: 'Legislação Municipal', overlap: 'ponte-peso', subtitle: 'Técnico: Básicos (1,00) · Idêntica à Apostila 09 do Analista (1,75)', subjects: ['Legislação Municipal'] },
-      ];
-
-      return tecOrder.map(g => ({
-        key: g.key,
-        apostilaTag: g.apostilaTag,
-        name: g.name,
-        overlap: g.overlap,
-        subtitle: g.subtitle,
-        matchTopics: (all: Topic[]) => {
-          const matched = all.filter(t => g.subjects.includes(t.subject) && t.overlap !== 'exclusivo-analista');
-          if (g.key === 'tec-07') {
-            return [...matched].sort(
-              (a, b) => (TEC_ESPECIFICOS_TOC_META[a.id]?.order ?? 99) - (TEC_ESPECIFICOS_TOC_META[b.id]?.order ?? 99)
-            );
-          }
-          return matched;
-        },
-      }));
-    }
-
-    // 'all' or 'comum': unified 10 disciplines with both apostila references
-    return SUBJECT_META.map((sm: SubjectMeta) => ({
-      key: `all-${sm.name}`,
-      apostilaTag: undefined as string | undefined,
-      name: sm.name,
-      overlap: sm.overlap,
-      subtitle: [
-        sm.apostilaAnl ? `Analista: ${sm.apostilaAnl} (${sm.wAnl})` : null,
-        sm.apostilaTec ? `Técnico: ${sm.apostilaTec} (${sm.wTec})` : null,
-      ]
-        .filter(Boolean)
-        .join(' · '),
-      matchTopics: (all: Topic[]) =>
-        all.filter(t => {
-          if (t.subject !== sm.name) return false;
-          if (viewMode === 'comum' && t.overlap !== 'ambos-identico' && t.overlap !== 'ponte-peso') return false;
-          return true;
-        }),
-    }));
-  }, [isCmcPlan, topics, viewMode]);
-
-  const filteredBySubject: GroupedApostila[] = useMemo(() => {
+  // Build validated discipline groups from APOSTILAS_CATALOG for CMC, or generic groups for custom plans
+  const groups = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rawGroups
-      .map((g, groupIdx) => {
-        if (filterSubject !== 'all' && g.name !== filterSubject) return null;
-        const items = g.matchTopics(topics).filter(t => {
-          if (q && !`${t.title} ${t.subject} ${t.notes}`.toLowerCase().includes(q)) return false;
-          if (filterStatus === 'study' && !t.study_queue) return false;
-          if (filterStatus === 'review' && !t.review_queue) return false;
-          if (filterStatus !== 'all' && filterStatus !== 'study' && filterStatus !== 'review' && t.status !== filterStatus) return false;
-          return true;
-        });
-        if (items.length === 0) return null;
-        const done = items.filter(t => t.status === 'revisar' || t.status === 'dominado').length;
+
+    if (!isCmcPlan) {
+      const subjects = Array.from(new Set(topics.map(t => t.subject)));
+      return subjects
+        .map(subject => {
+          const items = topics.filter(t => {
+            if (t.subject !== subject) return false;
+            if (statusFilter === 'pendente' && t.status !== 'nao-iniciado') return false;
+            if (statusFilter === 'estudando' && t.status !== 'estudando') return false;
+            if (statusFilter === 'concluido' && t.status !== 'revisar' && t.status !== 'dominado') return false;
+            if (q && !t.title.toLowerCase().includes(q) && !t.subject.toLowerCase().includes(q)) return false;
+            return true;
+          });
+          return {
+            key: subject,
+            code: '',
+            title: subject,
+            weight: '',
+            highWeight: false,
+            apostilaId: '',
+            items: items.map(t => ({
+              topic: t,
+              chapterNumber: 0,
+              printedPageStart: 0,
+              printedPageEnd: 0,
+              pdfPageStart: 0,
+              editalRef: '',
+              validationStatus: 'validado' as const,
+              validationNote: undefined as string | undefined,
+              fallbackApostilaId: undefined as string | undefined,
+              fallbackPdfPage: undefined as number | undefined,
+            })),
+          };
+        })
+        .filter(g => g.items.length > 0);
+    }
+
+    const apostilas = getApostilasForCargo(cargoTab, false);
+    return apostilas
+      .map(ap => {
+        const rows = ap.chapters
+          .map(ch => {
+            const topic = ch.topicId ? topicMap.get(ch.topicId) : null;
+            if (!topic) return null;
+            if (statusFilter === 'pendente' && topic.status !== 'nao-iniciado') return null;
+            if (statusFilter === 'estudando' && topic.status !== 'estudando') return null;
+            if (statusFilter === 'concluido' && topic.status !== 'revisar' && topic.status !== 'dominado') return null;
+            if (
+              q &&
+              !ch.title.toLowerCase().includes(q) &&
+              !ap.title.toLowerCase().includes(q) &&
+              !ch.editalRef.toLowerCase().includes(q)
+            ) {
+              return null;
+            }
+            return {
+              topic,
+              chapterNumber: ch.chapterNumber,
+              printedPageStart: ch.printedPageStart,
+              printedPageEnd: ch.printedPageEnd,
+              pdfPageStart: ch.pdfPageStart,
+              editalRef: ch.editalRef,
+              validationStatus: ch.validationStatus,
+              validationNote: ch.validationNote,
+              fallbackApostilaId: ch.fallbackApostilaId,
+              fallbackPdfPage: ch.fallbackPdfPage,
+            };
+          })
+          .filter(Boolean) as Array<{
+            topic: Topic;
+            chapterNumber: number;
+            printedPageStart: number;
+            printedPageEnd: number;
+            pdfPageStart: number;
+            editalRef: string;
+            validationStatus: 'validado' | 'atencao' | 'lacuna' | 'fora-edital';
+            validationNote?: string;
+            fallbackApostilaId?: string;
+            fallbackPdfPage?: number;
+          }>;
+
         return {
-          key: g.key,
-          apostilaTag: g.apostilaTag,
-          name: g.name,
-          overlap: g.overlap,
-          subtitle: g.subtitle,
-          items,
-          done,
-          defaultOpen: groupIdx < 1,
+          key: ap.id,
+          code: cargoTab === 'tecnico' ? ap.codeTec || ap.codeAnl || '' : ap.codeAnl || ap.codeTec || '',
+          title: ap.title,
+          weight: cargoTab === 'tecnico' ? ap.weightTec || ap.weightAnl || '' : ap.weightAnl || ap.weightTec || '',
+          highWeight: cargoTab === 'tecnico' ? Boolean(ap.highWeightTec) : Boolean(ap.highWeightAnl),
+          apostilaId: ap.id,
+          items: rows,
         };
       })
-      .filter(Boolean) as GroupedApostila[];
-  }, [topics, rawGroups, search, filterSubject, filterStatus]);
+      .filter(g => g.items.length > 0);
+  }, [isCmcPlan, cargoTab, search, statusFilter, topics, topicMap]);
 
-  const totalVisibleTopics = useMemo(
-    () => filteredBySubject.reduce((acc, g) => acc + g.items.length, 0),
-    [filteredBySubject]
-  );
-
-  function toggleExpand(key: string, currentOpen: boolean) {
-    setExpanded(prev => ({ ...prev, [key]: !currentOpen }));
-  }
-
-  function statusLabel(st: string) {
-    if (st === 'dominado') return { txt: 'Dominado', cls: 'ds-badge-green' };
-    if (st === 'revisar') return { txt: 'Em revisão', cls: 'ds-badge-amber' };
-    if (st === 'estudando') return { txt: 'Estudando', cls: 'ds-badge-blue' };
-    return { txt: 'Não iniciado', cls: 'ds-badge-neutral' };
-  }
-
-  function overlapLabel(ov: string) {
-    if (ov === 'ambos-identico') return { txt: 'Comum 2 Cargos', cls: 'ds-badge-green' };
-    if (ov === 'ponte-peso') return { txt: 'Ponte (Muda Peso)', cls: 'ds-badge-amber' };
-    if (ov === 'exclusivo-analista') return { txt: 'Analista TI', cls: 'ds-badge-indigo' };
-    return { txt: 'Técnico Leg.', cls: 'ds-badge-blue' };
-  }
+  const stats = useMemo(() => {
+    const valid = topics.filter(t => t.id !== 'tec-cap-9');
+    const done = valid.filter(t => t.status === 'revisar' || t.status === 'dominado').length;
+    const studying = valid.filter(t => t.status === 'estudando').length;
+    return {
+      total: valid.length,
+      done,
+      studying,
+      pct: valid.length > 0 ? Math.round((done / valid.length) * 100) : 0,
+    };
+  }, [topics]);
 
   return (
-    <div className="ds-container">
-      {/* Apostila / Folder Selector for CMC 2026 */}
-      {isCmcPlan && (
-        <div className="flex-row" style={{ justifyContent: 'space-between', gap: 12 }}>
-          <div className="segmented" role="tablist" aria-label="Separar por apostilas">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'analista'}
-              className={`seg-btn ${viewMode === 'analista' ? 'active' : ''}`}
-              onClick={() => {
-                setViewMode('analista');
-                setFilterSubject('all');
-              }}
-            >
-              Apostilas Analista TI (01–09)
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'tecnico'}
-              className={`seg-btn ${viewMode === 'tecnico' ? 'active' : ''}`}
-              onClick={() => {
-                setViewMode('tecnico');
-                setFilterSubject('all');
-              }}
-            >
-              Apostilas Técnico (01–08)
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'all'}
-              className={`seg-btn ${viewMode === 'all' ? 'active' : ''}`}
-              onClick={() => {
-                setViewMode('all');
-                setFilterSubject('all');
-              }}
-            >
-              Todas unificadas
-            </button>
-          </div>
-
-          <span className="text-xs muted">
-            {filteredBySubject.length} {viewMode === 'analista' || viewMode === 'tecnico' ? 'apostilas' : 'disciplinas'} · {totalVisibleTopics} capítulos
-          </span>
+    <div className="edital-view">
+      {/* Header */}
+      <header className="section-head">
+        <div>
+          <span className="eyebrow">{isCmcPlan ? EDITAL_INFO.number : activePlan?.syllabus_label || 'Conteúdo Programático'}</span>
+          <h1 className="editorial-h1">
+            {isCmcPlan ? 'Edital Verticalizado & Validação' : activePlan?.title || 'Edital'}
+          </h1>
+          <p className="section-sub">
+            {isCmcPlan
+              ? `${EDITAL_INFO.organ} · Banca ${EDITAL_INFO.banca} · Prova ${EDITAL_INFO.examDateBR}`
+              : `${stats.done}/${stats.total} tópicos concluídos (${stats.pct}%)`}
+          </p>
         </div>
+        <div className="section-head-actions">
+          <div className="edital-progress-pill">
+            <span>Edital concluído</span>
+            <strong className="mono">{stats.done}/{stats.total} ({stats.pct}%)</strong>
+          </div>
+          <button type="button" className="btn-ghost" onClick={onCreateCustom}>
+            <Icons.Plus size={14} /> Novo tópico
+          </button>
+        </div>
+      </header>
+
+      {/* Official Two-Cargo Comparison Cards */}
+      {isCmcPlan && (
+        <section className="cargo-grid" aria-label="Estrutura oficial das provas">
+          {(['analista', 'tecnico'] as CargoKey[]).map(key => {
+            const c = EDITAL_CARGOS[key];
+            return (
+              <div key={c.key} className="cargo-card">
+                <div className="cargo-card-top">
+                  <div>
+                    <span className="cargo-turno-badge">{c.turno} · {c.duration} · {c.code}</span>
+                    <h2 className="cargo-name">{c.name}</h2>
+                  </div>
+                  <div className="cargo-salary">
+                    <strong className="mono">{c.totalMensal}</strong>
+                    <span>{c.vencimento} + auxílios</span>
+                  </div>
+                </div>
+
+                <div className="cargo-meta-line">
+                  <span>{c.vagasDetail}</span>
+                  <span>·</span>
+                  <span>{c.jornada}</span>
+                  <span>·</span>
+                  <span>Mínimo: {c.minObjetiva}</span>
+                </div>
+
+                <div className="cargo-areas-table">
+                  {c.areas.map(area => (
+                    <div key={area.name} className={`cargo-area-row ${area.weight > 1 ? 'highlight' : ''}`}>
+                      <div className="cargo-area-name">
+                        <strong>{area.name}</strong>
+                        <span>{area.disciplines.join(' · ')}</span>
+                      </div>
+                      <div className="cargo-area-pts mono">
+                        <strong>{area.totalPoints} pts</strong>
+                        <span>{area.questions}q × {area.weight.toFixed(2).replace('.', ',')}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </section>
       )}
 
-      {/* Toolbar */}
-      <div className="ds-card ds-card-body">
-        <div className="edital-toolbar" style={{ gridTemplateColumns: '2fr 1fr 1fr auto' }}>
-          <div className="search-wrap">
-            <Icons.Search size={15} />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Pesquisar capítulo ou assunto..."
-            />
+      {/* Validation Audit Findings */}
+      {isCmcPlan && (
+        <section className="audit-panel">
+          <div className="audit-panel-head">
+            <div className="audit-title-group">
+              <Icons.ShieldCheck size={18} />
+              <div>
+                <h3>Auditoria Edital × Apostilas Disponíveis</h3>
+                <p>Cruzamento real do Anexo V do Edital com os 13 PDFs do Google Drive.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setShowAudit(v => !v)}
+              aria-expanded={showAudit}
+            >
+              {showAudit ? 'Ocultar auditoria' : 'Mostrar auditoria (5 achados)'}
+            </button>
           </div>
 
-          <select aria-label="Matéria" className="ds-select" value={filterSubject} onChange={e => setFilterSubject(e.target.value)}>
-            <option value="all">{viewMode === 'analista' || viewMode === 'tecnico' ? 'Apostila: Todas' : 'Matéria: Todas'}</option>
-            {rawGroups.map(s => (
-              <option key={s.key} value={s.name}>
-                {s.apostilaTag ? `${s.apostilaTag} · ${s.name}` : s.name}
-              </option>
-            ))}
+          {showAudit && (
+            <div className="audit-grid">
+              {EDITAL_AUDIT_FINDINGS.map(f => (
+                <div key={f.id} className={`audit-card sev-${f.severity}`}>
+                  <div className="audit-card-top">
+                    <span className={`val-badge status-${f.severity === 'estrategia' ? 'validado' : f.severity}`}>
+                      {f.severity === 'lacuna'
+                        ? 'Lacuna na Apostila'
+                        : f.severity === 'fora-edital'
+                        ? 'Fora do Edital'
+                        : f.severity === 'atencao'
+                        ? 'Atenção'
+                        : 'Estratégia'}
+                    </span>
+                    <span className="audit-cargo-tag">{f.cargo}</span>
+                  </div>
+                  <h4>{f.title}</h4>
+                  <p>{f.summary}</p>
+                  <div className="audit-action-line">
+                    <strong>Recomendação:</strong> {f.action}
+                  </div>
+                  {f.targetApostilaId && (
+                    <button
+                      type="button"
+                      className="btn-read-page"
+                      onClick={() =>
+                        onOpenReader({
+                          apostilaId: f.targetApostilaId!,
+                          pdfPage: f.targetPage || 2,
+                          preferredCargo: f.cargo === 'Técnico Legislativo' ? 'tecnico' : 'analista',
+                        })
+                      }
+                    >
+                      <Icons.BookOpen size={13} /> Abrir na apostila recomendada
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Filters Toolbar */}
+      <div className="lib-toolbar">
+        {isCmcPlan && (
+          <div className="seg-group" role="tablist" aria-label="Filtrar edital por cargo">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={cargoTab === 'analista'}
+              className={`seg-btn ${cargoTab === 'analista' ? 'active' : ''}`}
+              onClick={() => setCargoTab('analista')}
+            >
+              Analista TI
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={cargoTab === 'tecnico'}
+              className={`seg-btn ${cargoTab === 'tecnico' ? 'active' : ''}`}
+              onClick={() => setCargoTab('tecnico')}
+            >
+              Técnico Legislativo
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={cargoTab === 'all'}
+              className={`seg-btn ${cargoTab === 'all' ? 'active' : ''}`}
+              onClick={() => setCargoTab('all')}
+            >
+              Todos
+            </button>
+          </div>
+        )}
+
+        <div className="lib-toolbar-right">
+          <select
+            className="filter-select"
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
+            aria-label="Filtrar por status"
+          >
+            <option value="all">Todos os status</option>
+            <option value="pendente">Não iniciados</option>
+            <option value="estudando">Estudando</option>
+            <option value="concluido">Concluídos</option>
           </select>
 
-          <select aria-label="Status" className="ds-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-            <option value="all">Status: Todos</option>
-            <option value="study">No plano de Hoje</option>
-            <option value="review">Em Revisão</option>
-            <option value="nao-iniciado">Não Iniciados</option>
-            <option value="dominado">Dominados</option>
-          </select>
-
-          <button onClick={onCreateCustom} className="ds-btn ds-btn-primary ds-btn-sm">
-            <Icons.Plus size={14} /> Novo Tópico
-          </button>
+          <div className="search-field">
+            <Icons.Search size={15} />
+            <input
+              type="search"
+              placeholder="Filtrar tópico do edital..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              aria-label="Filtrar tópico do edital"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Tree / Accordion por Apostila ou Matéria */}
-      {filteredBySubject.length === 0 ? (
-        <div className="ds-card empty-box">
-          <div className="empty-title">Nenhum conteúdo encontrado</div>
-          <p className="empty-desc">Tente limpar os filtros ou pesquisar outro termo.</p>
-        </div>
-      ) : (
-        <div className="subject-tree">
-          {filteredBySubject.map(group => {
-            const explicit = expanded[group.key];
-            const isOpen = Boolean(
-              search.trim() ||
-              filterSubject !== 'all' ||
-              filterStatus !== 'all' ||
-              (explicit !== undefined ? explicit : group.defaultOpen)
-            );
-            const pct = group.items.length ? Math.round((group.done / group.items.length) * 100) : 0;
-            const ov = overlapLabel(group.overlap);
+      {/* Verticalized Syllabus Matrix */}
+      <div className="edital-groups">
+        {groups.length === 0 ? (
+          <div className="empty-state-box">
+            <p>Nenhum tópico corresponde aos filtros atuais.</p>
+          </div>
+        ) : (
+          groups.map(g => {
+            const validItems = g.items.filter(i => i.validationStatus !== 'fora-edital');
+            const done = validItems.filter(
+              i => i.topic.status === 'revisar' || i.topic.status === 'dominado'
+            ).length;
+            const pct = validItems.length > 0 ? Math.round((done / validItems.length) * 100) : 0;
 
             return (
-              <section key={group.key} className="ds-card">
-                <button className="tree-header" onClick={() => toggleExpand(group.key, isOpen)}>
-                  <div className="tree-title-group">
-                    <div className="flex-row" style={{ gap: 8 }}>
-                      {group.apostilaTag && (
-                        <span className="ds-badge ds-badge-neutral" style={{ fontWeight: 700 }}>
-                          {group.apostilaTag}
+              <section key={g.key} className="edital-group-card">
+                <div className="edital-group-head">
+                  <div>
+                    <div className="apostila-badges">
+                      {g.code && <span className="ap-code-pill">{g.code}</span>}
+                      {g.weight && (
+                        <span className={`ap-weight-pill ${g.highWeight ? 'gold' : ''}`}>
+                          {g.weight}
                         </span>
                       )}
-                      <span className="tree-subject-name">{group.name}</span>
-                      {isCmcPlan && <span className={`ds-badge ${ov.cls}`}>{ov.txt}</span>}
                     </div>
-                    {group.subtitle && (
-                      <div className="text-xs muted" style={{ marginTop: 3 }}>
-                        {group.subtitle}
-                      </div>
+                    <h3>{g.title}</h3>
+                  </div>
+                  <div className="edital-group-right">
+                    <span className="mono">{done}/{validItems.length} ({pct}%)</span>
+                    {g.apostilaId && (
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={() =>
+                          onOpenReader({
+                            apostilaId: g.apostilaId,
+                            pdfPage: 2,
+                            preferredCargo,
+                          })
+                        }
+                      >
+                        <Icons.BookOpen size={14} /> Abrir Apostila
+                      </button>
                     )}
                   </div>
+                </div>
 
-                  <div className="tree-right">
-                    <div className="tree-prog-wrap">
-                      <span className="text-xs muted">{group.done}/{group.items.length} ({pct}%)</span>
-                      <div className="ds-progress" style={{ width: 84 }}>
-                        <div className="ds-progress-fill indigo" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                    <span className={`chevron-rot ${isOpen ? 'open' : ''}`}><Icons.ChevronDown size={16} /></span>
-                  </div>
-                </button>
+                <div className="edital-topic-list">
+                  {g.items.map(row => {
+                    const t = row.topic;
+                    const isDone = t.status === 'revisar' || t.status === 'dominado';
+                    const isExcluded = row.validationStatus === 'fora-edital';
+                    const matched = !g.apostilaId ? findChapterForTopic(t.id, preferredCargo) : null;
+                    const targetApId = row.fallbackApostilaId || g.apostilaId || matched?.apostila.id;
+                    const targetPdfPage = row.fallbackPdfPage || row.pdfPageStart || matched?.chapter.pdfPageStart || 2;
 
-                {isOpen && (
-                  <div className="tree-children">
-                    {group.items.map((t, idx) => {
-                      const st = statusLabel(t.status);
-                      const lowAcc = t.q_total >= 4 && (t.q_right / t.q_total) < 0.6;
-                      const priBadge =
-                        isCmcPlan
-                          ? t.overlap === 'ponte-peso'
-                            ? 'Peso 1,75×'
-                            : t.overlap === 'exclusivo-analista' || t.overlap === 'exclusivo-tecnico'
-                            ? 'Peso 1,75×'
-                            : 'Peso 1,0×'
-                          : t.priority === 'alta'
-                          ? 'Alta prioridade'
-                          : 'Média';
+                    return (
+                      <div
+                        key={`${g.key}-${t.id}`}
+                        className={`edital-topic-row ${isDone ? 'is-done' : ''} ${isExcluded ? 'is-excluded' : ''}`}
+                      >
+                        <button
+                          type="button"
+                          className={`status-check ${isDone ? 'checked' : ''}`}
+                          onClick={() =>
+                            onTopicAction({
+                              action: 'toggle_done',
+                              id: t.id,
+                            })
+                          }
+                          aria-label={isDone ? `Reabrir ${t.title}` : `Concluir ${t.title}`}
+                        >
+                          {isDone && <Icons.Check size={12} />}
+                        </button>
 
-                      const pageNum = group.key === 'tec-07' ? TEC_ESPECIFICOS_TOC_META[t.id]?.page : undefined;
-
-                      return (
-                        <div key={t.id} className="tree-row">
-                          <div className="tree-row-main">
-                            <div className="tree-row-title">
-                              <span className="muted" style={{ fontSize: 11.5, fontWeight: 600, marginRight: 6 }}>
-                                Cap. {String(idx + 1).padStart(2, '0')}
-                                {pageNum ? ` · p. ${pageNum}` : ''}
+                        <div className="edital-topic-main">
+                          <div className="edital-topic-title">
+                            {row.chapterNumber > 0 && (
+                              <span className="toc-cap-num mono">
+                                Cap. {String(row.chapterNumber).padStart(2, '0')}
                               </span>
-                              {t.title}
-                            </div>
-                            <div className="tree-row-meta">
-                              <span className={`ds-badge ${st.cls}`}>{st.txt}</span>
-                              <span className="ds-badge ds-badge-indigo">{priBadge}</span>
-                              {lowAcc && <span className="ds-badge ds-badge-red">Reforçar (&lt;60%)</span>}
-                              <span className="mastery-dots" title={`Domínio ${t.mastery} de 5`}>
-                                {[1, 2, 3, 4, 5].map(n => (
-                                  <span key={n} className={`m-dot ${n <= t.mastery ? 'filled' : ''}`} />
-                                ))}
+                            )}
+                            <span>{t.title}</span>
+                          </div>
+                          <div className="edital-topic-meta">
+                            {row.editalRef && (
+                              <span className={`val-badge status-${row.validationStatus}`}>
+                                {row.editalRef}
                               </span>
-                              {t.q_total > 0 && (
-                                <span className="text-xs muted">{t.q_right}/{t.q_total}q ({Math.round((t.q_right / t.q_total) * 100)}%)</span>
-                              )}
-                              {t.review_queue && t.next_review_date && (
-                                <span className="text-xs muted">Rev. {fmtBR(t.next_review_date)}</span>
-                              )}
+                            )}
+                            {row.printedPageStart > 0 && (
+                              <span className="mono muted">
+                                p. {row.printedPageStart}–{row.printedPageEnd}
+                              </span>
+                            )}
+                            {t.minutes_studied > 0 && (
+                              <span className="mono muted">{t.minutes_studied} min</span>
+                            )}
+                            {t.next_review_date && (
+                              <span className="muted">Rev. {fmtBR(t.next_review_date)}</span>
+                            )}
+                          </div>
+                          {row.validationNote && (
+                            <div className={`toc-note status-${row.validationStatus}`}>
+                              <Icons.AlertTriangle size={12} />
+                              <span>{row.validationNote}</span>
                             </div>
-                          </div>
-
-                          <div className="tree-row-actions">
-                            <button
-                              onClick={() => onTopicAction({ action: 'toggle_study', id: t.id })}
-                              className={`ds-btn ds-btn-sm ${t.study_queue ? 'ds-btn-primary' : 'ds-btn-ghost'}`}
-                            >
-                              {t.study_queue ? 'No dia' : '+ Hoje'}
-                            </button>
-                            <button
-                              onClick={() => onTopicAction({ action: 'toggle_review', id: t.id })}
-                              className={`ds-btn ds-btn-sm ${t.review_queue ? 'ds-btn-secondary' : 'ds-btn-ghost'}`}
-                            >
-                              {t.review_queue ? 'Revisando' : '+ Revisar'}
-                            </button>
-                            <button onClick={() => onStartFocus(t)} className="ds-btn ds-btn-secondary ds-btn-sm">
-                              <Icons.Play size={12} /> Foco
-                            </button>
-                            <button onClick={() => onEditTopic(t)} className="ds-btn ds-btn-ghost ds-btn-sm">
-                              Editar
-                            </button>
-                          </div>
+                          )}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+
+                        <div className="edital-topic-actions">
+                          {targetApId && (
+                            <button
+                              type="button"
+                              className="btn-read-page"
+                              onClick={() =>
+                                onOpenReader({
+                                  apostilaId: targetApId,
+                                  pdfPage: targetPdfPage,
+                                  topicId: t.id,
+                                  chapterTitle: t.title,
+                                  preferredCargo,
+                                })
+                              }
+                            >
+                              <Icons.BookOpen size={13} />{' '}
+                              {row.fallbackApostilaId
+                                ? 'Ler Legislação'
+                                : row.printedPageStart > 0
+                                ? `Ler p. ${row.printedPageStart}`
+                                : 'Apostila'}
+                            </button>
+                          )}
+                          {!isExcluded && (
+                            <>
+                              <button
+                                type="button"
+                                className={`toc-queue-btn ${t.study_queue ? 'queued' : ''}`}
+                                onClick={() => onTopicAction({ action: 'toggle_study', id: t.id })}
+                              >
+                                {t.study_queue ? 'Na fila' : '+ Hoje'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-ghost"
+                                onClick={() => onStartFocus(t)}
+                              >
+                                Foco
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-ghost"
+                                onClick={() => onEditTopic(t)}
+                              >
+                                Editar
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </section>
             );
-          })}
-        </div>
-      )}
+          })
+        )}
+      </div>
     </div>
   );
 }

@@ -165,6 +165,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    if (body.action === 'save_notes') {
+      await sql`UPDATE topics SET notes = ${String(body.notes ?? '')} WHERE id = ${body.id}`;
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body.action === 'toggle_done') {
+      const rows = await sql`SELECT * FROM topics WHERE id = ${body.id}`;
+      const t = rows[0];
+      if (!t) return NextResponse.json({ error: 'Tópico não encontrado' }, { status: 404 });
+      const isCurrentlyDone = t.status === 'revisar' || t.status === 'dominado';
+      if (isCurrentlyDone) {
+        await sql`UPDATE topics SET status = 'estudando', review_queue = false WHERE id = ${body.id}`;
+      } else {
+        const nextRev = addDaysISO(todayISO(), 1);
+        await sql`
+          UPDATE topics
+          SET status = 'revisar', study_queue = false, review_queue = true,
+              review_interval = GREATEST(review_interval, 1),
+              next_review_date = ${t.next_review_date || nextRev},
+              mastery = GREATEST(mastery, 2)
+          WHERE id = ${body.id}
+        `;
+      }
+      return NextResponse.json({ ok: true });
+    }
+
     return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erro interno';

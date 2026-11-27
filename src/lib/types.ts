@@ -100,7 +100,15 @@ export interface Flashcard {
   next_review_date: string;
 }
 
-export type NavTab = 'hoje' | 'pratica' | 'mentor' | 'edital' | 'caderno';
+export type NavTab = 'hoje' | 'apostilas' | 'edital' | 'pratica' | 'mentor' | 'caderno';
+
+export interface ReaderTarget {
+  apostilaId: string;
+  pdfPage?: number;
+  topicId?: string;
+  chapterTitle?: string;
+  preferredCargo?: 'analista' | 'tecnico';
+}
 
 export function fmtBR(iso: string) {
   if (!iso) return '—';

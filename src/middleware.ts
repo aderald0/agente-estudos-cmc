@@ -15,7 +15,7 @@ export function middleware(request: NextRequest) {
   }
   response.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'self' https://drive.google.com https://docs.google.com; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
   );
 
   // Prevent caching of sensitive API responses (except public PWA icon)
