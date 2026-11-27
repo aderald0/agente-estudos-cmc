@@ -4,6 +4,8 @@ import { getApostilaById } from '../../../lib/apostilasCatalog';
 
 export const dynamic = 'force-dynamic';
 
+const MAX_PROXY_BYTES = 4_200_000; // Safe margin under Vercel's 4.5MB serverless response limit
+
 export async function GET(req: Request) {
   const session = await getCurrentSession();
   if (!session) {
@@ -29,26 +31,62 @@ export async function GET(req: Request) {
 
   const downloadUrl = `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=download&confirm=t`;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
   try {
     const upstream = await fetch(downloadUrl, {
       redirect: 'follow',
+      signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0',
       },
     });
+    clearTimeout(timeoutId);
 
-    const contentType = upstream.headers.get('content-type') || '';
+    const contentType = (upstream.headers.get('content-type') || '').toLowerCase();
+    const contentLength = Number(upstream.headers.get('content-length') || '0');
+
+    // Fast-fail if Google Drive returned login/HTML page without reading body
     if (!upstream.ok || contentType.includes('text/html')) {
+      try {
+        await upstream.body?.cancel();
+      } catch {
+        // ignore
+      }
       return NextResponse.json(
         {
           error: 'drive_private',
-          message: 'Arquivo privado no Google Drive. Compartilhe como "Qualquer pessoa com o link" ou vincule o PDF local.',
+          message: 'Arquivo privado no Google Drive.',
         },
         { status: 403 }
       );
     }
 
+    // Fast-fail if file exceeds Vercel serverless response limit
+    if (contentLength > MAX_PROXY_BYTES) {
+      try {
+        await upstream.body?.cancel();
+      } catch {
+        // ignore
+      }
+      return NextResponse.json(
+        {
+          error: 'too_large',
+          message: 'PDF acima de 4 MB: use o botão Vincular PDF para abrir offline na página exata.',
+        },
+        { status: 413 }
+      );
+    }
+
     const arrayBuffer = await upstream.arrayBuffer();
+    if (arrayBuffer.byteLength > MAX_PROXY_BYTES) {
+      return NextResponse.json(
+        { error: 'too_large', message: 'PDF acima de 4 MB.' },
+        { status: 413 }
+      );
+    }
+
     const header = new Uint8Array(arrayBuffer.slice(0, 5));
     const isPdf =
       header[0] === 0x25 && // %
@@ -58,10 +96,7 @@ export async function GET(req: Request) {
 
     if (!isPdf) {
       return NextResponse.json(
-        {
-          error: 'drive_private',
-          message: 'O Google Drive exigiu login para baixar este arquivo.',
-        },
+        { error: 'drive_private', message: 'O Google Drive exigiu login para baixar este arquivo.' },
         { status: 403 }
       );
     }
@@ -75,9 +110,10 @@ export async function GET(req: Request) {
       },
     });
   } catch {
+    clearTimeout(timeoutId);
     return NextResponse.json(
-      { error: 'drive_fetch_failed', message: 'Falha ao consultar Google Drive.' },
-      { status: 502 }
+      { error: 'drive_timeout', message: 'Tempo esgotado ao consultar Google Drive.' },
+      { status: 504 }
     );
   }
 }

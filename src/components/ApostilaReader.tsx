@@ -92,6 +92,7 @@ export function ApostilaReader({
   const stageRef = useRef<HTMLElement | null>(null);
   const renderTaskRef = useRef<{ cancel?: () => void } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [localReloadTick, setLocalReloadTick] = useState(0);
   const [drivePrivateHint, setDrivePrivateHint] = useState(false);
 
   // Study timer & notes state
@@ -146,10 +147,11 @@ export function ApostilaReader({
     return () => window.clearInterval(id);
   }, [timerRunning]);
 
-  // Load local PDF from IndexedDB, or auto-fetch via /api/apostila-pdf if Drive link is shared
+  // Load local PDF from IndexedDB, or fast-check /api/apostila-pdf (max 4s) without blocking Drive fallback
   useEffect(() => {
     let cancelled = false;
     let loadedDoc: PdfDocProxy | null = null;
+    const controller = new AbortController();
 
     async function loadPdf() {
       setPdfLoading(true);
@@ -157,28 +159,50 @@ export function ApostilaReader({
       try {
         let buffer: ArrayBuffer | null = null;
 
-        if (storedMeta) {
-          const rec = await getApostilaPdf(target.apostilaId);
-          if (rec) buffer = rec.buffer;
+        // 1. Try IndexedDB local cache first (instant, works offline)
+        const rec = await getApostilaPdf(target.apostilaId).catch(() => null);
+        if (rec) {
+          buffer = rec.buffer;
         }
 
+        // 2. If not cached locally, fast-try /api/apostila-pdf (abort after 4s so Drive preview opens quickly)
         if (!buffer && apostila) {
-          const cargoParam = target.preferredCargo || 'analista';
-          const res = await fetch(
-            `/api/apostila-pdf?id=${encodeURIComponent(apostila.id)}&cargo=${cargoParam}`,
-            { credentials: 'same-origin' }
-          );
-          if (res.ok && (res.headers.get('content-type') || '').includes('pdf')) {
-            const downloaded = await res.arrayBuffer();
-            if (!cancelled) {
-              const fileObj = new File([downloaded], `${apostila.slug}.pdf`, {
-                type: 'application/pdf',
-              });
-              const meta = await saveApostilaPdf(apostila.id, fileObj);
-              onPdfStored(meta);
-              buffer = downloaded;
+          const skipKey = `cmc_drive_skip_${apostila.id}`;
+          const alreadySkipped = typeof window !== 'undefined' && sessionStorage.getItem(skipKey) === '1';
+
+          if (!alreadySkipped) {
+            const timer = window.setTimeout(() => controller.abort(), 4000);
+            try {
+              const cargoParam = target.preferredCargo || 'analista';
+              const res = await fetch(
+                `/api/apostila-pdf?id=${encodeURIComponent(apostila.id)}&cargo=${cargoParam}`,
+                { credentials: 'same-origin', signal: controller.signal }
+              );
+              window.clearTimeout(timer);
+              if (res.ok && (res.headers.get('content-type') || '').includes('pdf')) {
+                const downloaded = await res.arrayBuffer();
+                if (!cancelled) {
+                  buffer = downloaded;
+                  const fileObj = new File([downloaded], `${apostila.slug}.pdf`, {
+                    type: 'application/pdf',
+                  });
+                  saveApostilaPdf(apostila.id, fileObj)
+                    .then(meta => {
+                      if (!cancelled) onPdfStored(meta);
+                    })
+                    .catch(() => {});
+                }
+              } else {
+                if (typeof window !== 'undefined' && (res.status === 403 || res.status === 413)) {
+                  sessionStorage.setItem(skipKey, '1');
+                }
+                if (!cancelled) setDrivePrivateHint(true);
+              }
+            } catch {
+              window.clearTimeout(timer);
+              if (!cancelled) setDrivePrivateHint(true);
             }
-          } else if (res.status === 403) {
+          } else {
             if (!cancelled) setDrivePrivateHint(true);
           }
         }
@@ -221,9 +245,10 @@ export function ApostilaReader({
     loadPdf();
     return () => {
       cancelled = true;
+      controller.abort();
       loadedDoc?.destroy?.();
     };
-  }, [target.apostilaId, target.preferredCargo, storedMeta, apostila]);
+  }, [target.apostilaId, target.preferredCargo, apostila, localReloadTick]);
 
   // Render current page to canvas
   useEffect(() => {
@@ -310,6 +335,7 @@ export function ApostilaReader({
     try {
       const meta = await saveApostilaPdf(apostila.id, file);
       onPdfStored(meta);
+      setLocalReloadTick(t => t + 1);
       flashToast(`PDF vinculado offline (${formatBytes(meta.size)})`);
     } catch (err) {
       setPdfError(err instanceof Error ? err.message : 'Erro ao salvar PDF.');
@@ -656,6 +682,16 @@ export function ApostilaReader({
             <div className="reader-center-msg">
               <div className="spinner" />
               <p>Abrindo apostila direto na página {currentPage}...</p>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => {
+                  setPdfLoading(false);
+                  setDrivePrivateHint(true);
+                }}
+              >
+                Abrir Preview Drive agora
+              </button>
             </div>
           ) : pdfDoc ? (
             <div className="reader-canvas-wrap">
