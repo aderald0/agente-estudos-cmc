@@ -143,10 +143,93 @@ export const INITIAL_TOPICS: SeedTopic[] = [
 ];
 
 export const ESSAY_PROMPTS = [
-  { id: 'anl-1', cargo: 'Analista TI', title: 'LGPD, LAI e ISO 27001/27002 na Câmara Municipal', desc: 'Discorra sobre a conciliação entre transparência ativa (LAI nº 12.527/2011) e proteção de dados pessoais (LGPD nº 13.709/2018) na Câmara Municipal de Cuiabá, citando controles da ISO/IEC 27001 e 27002.' },
-  { id: 'anl-2', cargo: 'Analista TI', title: 'Contratação de TI pela Lei nº 14.133/2021 e PDTI', desc: 'Analise a importância do PDTI e do Estudo Técnico Preliminar na contratação de soluções de TI sob a Lei nº 14.133/2021, abordando matriz de riscos e gestão contratual.' },
-  { id: 'tec-1', cargo: 'Técnico Legislativo', title: 'Atos Administrativos e Princípios Constitucionais (art. 37 CF)', desc: 'Explique os princípios LIMPE da Administração Pública e diferencie os requisitos de validade dos atos administrativos, bem como anulação e revogação.' },
-  { id: 'tec-2', cargo: 'Técnico Legislativo', title: 'Processo Legislativo Municipal, Comissões e Redação Oficial', desc: 'Discorra sobre o papel das Comissões Permanentes e do Plenário na tramitação de proposições municipais e a importância da redação oficial e da arquivologia.' },
+  // Analista Legislativo — Tecnologia da Informação (7 temas · 20–30 linhas · Peso 100 pts)
+  {
+    id: 'anl-1',
+    cargo: 'Analista TI',
+    title: 'LGPD, LAI e ISO 27001/27002 na Câmara Municipal',
+    desc: 'Discorra sobre a conciliação entre transparência ativa (LAI nº 12.527/2011) e proteção de dados pessoais (LGPD nº 13.709/2018) na Câmara Municipal de Cuiabá, citando controles da ABNT NBR ISO/IEC 27001 e 27002.',
+  },
+  {
+    id: 'anl-2',
+    cargo: 'Analista TI',
+    title: 'Contratação de TI pela Lei nº 14.133/2021 e PDTI',
+    desc: 'Analise o papel do Plano Diretor de TI (PDTI) e do Estudo Técnico Preliminar (ETP) na contratação de soluções de tecnologia sob a Lei nº 14.133/2021, abordando gestão de riscos, níveis de serviço (SLA) e fiscalização contratual.',
+  },
+  {
+    id: 'anl-3',
+    cargo: 'Analista TI',
+    title: 'Resposta a Incidentes, Backup e Continuidade de Negócios',
+    desc: 'Diante de um ataque ransomware contra os sistemas legislativos da Câmara, apresente um plano técnico de resposta a incidentes, contemplando contenção, política de backup (regra 3-2-1), gestão de acessos (IAM) e recuperação segura.',
+  },
+  {
+    id: 'anl-4',
+    cargo: 'Analista TI',
+    title: 'Arquitetura de APIs REST, Integração Contínua (CI/CD) e Contêineres',
+    desc: 'Explique como a adoção de APIs REST, controle de versões (Git), pipelines de CI/CD e conteinerização (Docker) eleva a disponibilidade, a rastreabilidade e a manutenibilidade dos sistemas públicos de tramitação legislativa.',
+  },
+  {
+    id: 'anl-5',
+    cargo: 'Analista TI',
+    title: 'Segurança de Redes, Segmentação VLAN e Defesa em Profundidade',
+    desc: 'Discorra sobre boas práticas de arquitetura de redes corporativas em órgãos públicos, abordando segmentação lógica, firewall, criptografia, monitoramento de vulnerabilidades e autenticação em múltiplos fatores (MFA).',
+  },
+  {
+    id: 'anl-6',
+    cargo: 'Analista TI',
+    title: 'Banco de Dados Relacional, Integridade e Business Intelligence (BI)',
+    desc: 'Aborde a importância da modelagem relacional, integridade referencial, rotinas de backup/recuperação e uso de painéis de Business Intelligence (ETL e indicadores) para apoiar a tomada de decisão e a transparência parlamentar.',
+  },
+  {
+    id: 'anl-7',
+    cargo: 'Analista TI',
+    title: 'Governança de TI, Gestão de Serviços e Suporte a Usuários',
+    desc: 'Analise como a gestão de serviços de TI (central de serviços, gestão de incidentes e problemas, SLA), aliada à documentação técnica e ao treinamento contínuo de servidores, reduz indisponibilidades e amplia a eficiência legislativa.',
+  },
+
+  // Técnico Legislativo (7 temas · 20–30 linhas · Peso 100 pts)
+  {
+    id: 'tec-1',
+    cargo: 'Técnico Legislativo',
+    title: 'Atos Administrativos e Princípios Constitucionais (art. 37 CF)',
+    desc: 'Explique os princípios expressos (LIMPE) da Administração Pública e diferencie os cinco requisitos de validade dos atos administrativos, destacando as distinções entre anulação e revogação (Súmula 473 STF).',
+  },
+  {
+    id: 'tec-2',
+    cargo: 'Técnico Legislativo',
+    title: 'Processo Legislativo Municipal, Comissões e Mesa Diretora',
+    desc: 'Discorra sobre a organização e o funcionamento da Câmara Municipal de Cuiabá, destacando o papel da Mesa Diretora, do Plenário e das Comissões Permanentes na tramitação e apreciação das proposições legislativas.',
+  },
+  {
+    id: 'tec-3',
+    cargo: 'Técnico Legislativo',
+    title: 'Redação Oficial: Atributos, Padrão Ofício e Impessoalidade',
+    desc: 'Analise os atributos fundamentais da redação oficial (clareza, precisão, objetividade, concisão, impessoalidade e formalidade) e explique a importância da padronização de ofícios, atas, requerimentos e relatórios na Câmara Municipal.',
+  },
+  {
+    id: 'tec-4',
+    cargo: 'Técnico Legislativo',
+    title: 'Gestão Documental, Arquivologia e Teoria das Três Idades',
+    desc: 'Explique as funções do protocolo e a classificação de documentos nas fases corrente, intermediária e permanente, ressaltando o papel da Tabela de Temporalidade Documental para a transparência e a preservação da memória legislativa.',
+  },
+  {
+    id: 'tec-5',
+    cargo: 'Técnico Legislativo',
+    title: 'Controle da Administração Pública e Responsabilidade Civil do Estado',
+    desc: 'Diferencie o controle administrativo, legislativo e judicial sobre os atos públicos e explique a responsabilidade civil objetiva do Estado (art. 37, § 6º, CF/88), incluindo o direito de regresso contra o agente público.',
+  },
+  {
+    id: 'tec-6',
+    cargo: 'Técnico Legislativo',
+    title: 'Orçamento Público: PPA, LDO, LOA e Estágios da Despesa',
+    desc: 'Apresente a função integrada do Plano Plurianual (PPA), da Lei de Diretrizes Orçamentárias (LDO) e da Lei Orçamentária Anual (LOA), explicando os estágios obrigatórios da execução da despesa pública (empenho, liquidação e pagamento).',
+  },
+  {
+    id: 'tec-7',
+    cargo: 'Técnico Legislativo',
+    title: 'Atendimento ao Público, Ética no Serviço Público e Ergonomia',
+    desc: 'Discorra sobre a postura profissional, a escuta ativa e a ética no atendimento ao cidadão na Câmara Municipal, relacionando esses fatores com a qualidade do serviço legislativo e a saúde ocupacional no ambiente de trabalho.',
+  },
 ];
 
 // Exact printed Sumário order and page numbers of Apostila 07 (Conhecimentos Específicos — Técnico Legislativo)

@@ -75,8 +75,10 @@ export function ApostilaReader({
   const [uploading, setUploading] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const stageRef = useRef<HTMLElement | null>(null);
   const renderTaskRef = useRef<{ cancel?: () => void } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [drivePrivateHint, setDrivePrivateHint] = useState(false);
 
   // Study timer & notes state
   const [timerSec, setTimerSec] = useState(0);
@@ -91,6 +93,7 @@ export function ApostilaReader({
       : getLastReadPage(target.apostilaId) || 1;
     setCurrentPage(nextP);
     setPageInput(String(nextP));
+    setDrivePrivateHint(false);
   }, [target.apostilaId, target.pdfPage]);
 
   // Active chapter based on currentPage
@@ -129,29 +132,54 @@ export function ApostilaReader({
     return () => window.clearInterval(id);
   }, [timerRunning]);
 
-  // Load local PDF from IndexedDB if stored
+  // Load local PDF from IndexedDB, or auto-fetch via /api/apostila-pdf if Drive link is shared
   useEffect(() => {
     let cancelled = false;
     let loadedDoc: PdfDocProxy | null = null;
 
-    async function loadLocalPdf() {
-      if (!storedMeta) {
-        setPdfDoc(null);
-        setPdfError('');
-        return;
-      }
+    async function loadPdf() {
       setPdfLoading(true);
       setPdfError('');
       try {
-        const rec = await getApostilaPdf(target.apostilaId);
-        if (!rec || cancelled) {
-          setPdfDoc(null);
-          setPdfLoading(false);
+        let buffer: ArrayBuffer | null = null;
+
+        if (storedMeta) {
+          const rec = await getApostilaPdf(target.apostilaId);
+          if (rec) buffer = rec.buffer;
+        }
+
+        if (!buffer && apostila) {
+          const cargoParam = target.preferredCargo || 'analista';
+          const res = await fetch(
+            `/api/apostila-pdf?id=${encodeURIComponent(apostila.id)}&cargo=${cargoParam}`,
+            { credentials: 'same-origin' }
+          );
+          if (res.ok && (res.headers.get('content-type') || '').includes('pdf')) {
+            const downloaded = await res.arrayBuffer();
+            if (!cancelled) {
+              const fileObj = new File([downloaded], `${apostila.slug}.pdf`, {
+                type: 'application/pdf',
+              });
+              const meta = await saveApostilaPdf(apostila.id, fileObj);
+              onPdfStored(meta);
+              buffer = downloaded;
+            }
+          } else if (res.status === 403) {
+            if (!cancelled) setDrivePrivateHint(true);
+          }
+        }
+
+        if (!buffer || cancelled) {
+          if (!cancelled) {
+            setPdfDoc(null);
+            setPdfLoading(false);
+          }
           return;
         }
+
         const pdfjsLib = await import('pdfjs-dist');
         pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(rec.buffer.slice(0)) });
+        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer.slice(0)) });
         const doc = (await loadingTask.promise) as unknown as PdfDocProxy;
         if (cancelled) {
           doc.destroy?.();
@@ -160,10 +188,15 @@ export function ApostilaReader({
         loadedDoc = doc;
         setPdfDoc(doc);
         setNumPages(doc.numPages);
-        setCurrentPage(prev => Math.min(Math.max(1, prev), doc.numPages));
+        const desiredPage = target.pdfPage && target.pdfPage >= 1
+          ? target.pdfPage
+          : getLastReadPage(target.apostilaId) || 1;
+        const clamped = Math.min(Math.max(1, desiredPage), doc.numPages);
+        setCurrentPage(clamped);
+        setPageInput(String(clamped));
       } catch (err) {
         if (!cancelled) {
-          setPdfError(err instanceof Error ? err.message : 'Não foi possível renderizar o PDF local.');
+          setPdfError(err instanceof Error ? err.message : 'Não foi possível renderizar o PDF.');
           setPdfDoc(null);
         }
       } finally {
@@ -171,12 +204,12 @@ export function ApostilaReader({
       }
     }
 
-    loadLocalPdf();
+    loadPdf();
     return () => {
       cancelled = true;
       loadedDoc?.destroy?.();
     };
-  }, [target.apostilaId, storedMeta]);
+  }, [target.apostilaId, target.preferredCargo, storedMeta, apostila]);
 
   // Render current page to canvas
   useEffect(() => {
@@ -206,6 +239,7 @@ export function ApostilaReader({
         renderTaskRef.current = task;
         await task.promise;
         saveLastReadPage(target.apostilaId, safePage);
+        stageRef.current?.scrollTo({ top: 0, behavior: 'auto' });
       } catch {
         // Ignore cancellation errors during fast page flips
       }
@@ -533,7 +567,7 @@ export function ApostilaReader({
         )}
 
         {/* Center: PDF Canvas OR Drive Preview + Local Linker */}
-        <main className={`reader-stage tone-${tone}`}>
+        <main ref={stageRef} className={`reader-stage tone-${tone}`}>
           {/* Validation alert banner if active chapter has a note */}
           {activeChapter?.validationNote && (
             <div className={`reader-validation-banner status-${activeChapter.validationStatus}`}>
@@ -563,7 +597,7 @@ export function ApostilaReader({
           {pdfLoading ? (
             <div className="reader-center-msg">
               <div className="spinner" />
-              <p>Carregando página {currentPage} da apostila...</p>
+              <p>Abrindo apostila direto na página {currentPage}...</p>
             </div>
           ) : pdfDoc ? (
             <div className="reader-canvas-wrap">
@@ -574,31 +608,54 @@ export function ApostilaReader({
             </div>
           ) : (
             <div className="reader-fallback">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                hidden
+                onChange={e => handleLocalFileUpload(e.target.files?.[0] || null)}
+              />
               <div className="reader-fallback-bar">
                 <div className="reader-fallback-info">
                   <span className="pill-accent">
-                    Alvo: pág. {activeChapter ? activeChapter.printedPageStart : printedPage} da apostila (PDF pág. {currentPage})
+                    Ir para pág. {activeChapter ? activeChapter.printedPageStart : printedPage} (PDF {currentPage})
                   </span>
                   <span className="reader-fallback-hint">
-                    {fallbackMode === 'drive'
-                      ? 'Visualizando via Google Drive. Para salto automático de página e modo offline, vincule o PDF local.'
-                      : 'Arraste o PDF desta apostila para abrir direto na página exata e salvar no navegador.'}
+                    {drivePrivateHint
+                      ? 'O iframe do Google Drive sempre abre na pág. 1. Para abrir direto na pág. exata: compartilhe a pasta no Drive como "Qualquer pessoa com o link (Leitor)" OU vincule o PDF local abaixo (1 única vez).'
+                      : 'Para salto automático para a página exata do capítulo, vincule o PDF local (salvo offline no navegador).'}
                   </span>
                 </div>
                 <div className="reader-fallback-tabs">
+                  {(apostila.driveFileIdAnl || apostila.driveFileIdTec) && (
+                    <a
+                      href={`https://drive.google.com/uc?export=download&id=${encodeURIComponent(
+                        target.preferredCargo === 'tecnico'
+                          ? apostila.driveFileIdTec || apostila.driveFileIdAnl || ''
+                          : apostila.driveFileIdAnl || apostila.driveFileIdTec || ''
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-ghost"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      1. Baixar PDF
+                    </a>
+                  )}
                   <button
                     type="button"
-                    className={`seg-btn ${fallbackMode === 'drive' ? 'active' : ''}`}
-                    onClick={() => setFallbackMode('drive')}
+                    className="btn-primary-sm"
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
                   >
-                    Preview Drive
+                    <Icons.Upload size={14} /> {uploading ? 'Salvando...' : `2. Vincular e ir pág. ${activeChapter?.printedPageStart || printedPage}`}
                   </button>
                   <button
                     type="button"
-                    className={`seg-btn ${fallbackMode === 'upload' ? 'active' : ''}`}
-                    onClick={() => setFallbackMode('upload')}
+                    className={`seg-btn ${fallbackMode === 'drive' ? 'active' : ''}`}
+                    onClick={() => setFallbackMode(m => (m === 'drive' ? 'upload' : 'drive'))}
                   >
-                    <Icons.Upload size={14} /> Vincular PDF
+                    {fallbackMode === 'drive' ? 'Arrastar PDF' : 'Preview Drive'}
                   </button>
                 </div>
               </div>
@@ -622,22 +679,15 @@ export function ApostilaReader({
                     handleLocalFileUpload(f);
                   }}
                 >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    hidden
-                    onChange={e => handleLocalFileUpload(e.target.files?.[0] || null)}
-                  />
                   <div className="reader-dropzone-icon">
                     <Icons.Library size={32} />
                   </div>
-                  <h3>Vincular PDF desta apostila</h3>
+                  <h3>Ativar salto automático para a página {activeChapter?.printedPageStart || printedPage}</h3>
                   <p>
                     Arquivo esperado: <code>{apostila.driveFileNameAnl || apostila.driveFileNameTec}</code>
                   </p>
                   <p className="muted">
-                    O arquivo fica salvo apenas no seu navegador (IndexedDB). Abre instantaneamente na página {activeChapter?.printedPageStart || 1} com zoom, modo noturno e atalhos de teclado.
+                    Solte o PDF aqui uma única vez: ele fica salvo offline no navegador (IndexedDB) e a partir daí sempre abre direto na página certa do capítulo.
                   </p>
                   <button
                     type="button"

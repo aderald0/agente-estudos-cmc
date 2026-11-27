@@ -1,7 +1,10 @@
 import { neon } from '@neondatabase/serverless';
 import { FLASHCARDS_SEED } from './flashcardsSeed';
 import { PRACTICE_QUESTIONS_SEED } from './questionsSeed';
+import { SELECON_EXTRA_QUESTIONS } from './seleconExtraQuestions';
 import { EXAM_DATE, INITIAL_TOPICS } from './syllabus';
+
+const ALL_PRACTICE_QUESTIONS = [...PRACTICE_QUESTIONS_SEED, ...SELECON_EXTRA_QUESTIONS];
 
 export const DEFAULT_PLAN_ID = 'cmc-2026';
 
@@ -239,10 +242,10 @@ export async function ensureSchema() {
     WHERE id = 'adm-cap-6' AND title LIKE 'Controle e responsabilização%'
   `;
 
-  // Seed 200 real apostila questions for CMC 2026 if empty
+  // Seed 270 real & Selecon-style questions for CMC 2026 (idempotent incremental migration)
   const qCount = await sql`SELECT COUNT(*)::int AS cnt FROM practice_questions WHERE plan_id = 'cmc-2026'`;
-  if ((qCount[0]?.cnt ?? 0) === 0) {
-    for (const q of PRACTICE_QUESTIONS_SEED) {
+  if ((qCount[0]?.cnt ?? 0) < ALL_PRACTICE_QUESTIONS.length) {
+    for (const q of ALL_PRACTICE_QUESTIONS) {
       await sql`
         INSERT INTO practice_questions (id, plan_id, subject, qnum, stem, options_json, answer)
         VALUES (${q.id}, ${DEFAULT_PLAN_ID}, ${q.subject}, ${q.qnum}, ${q.stem}, ${JSON.stringify(q.options)}, ${q.answer})
